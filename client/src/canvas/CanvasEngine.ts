@@ -1,6 +1,11 @@
+import type { Rectangle } from "./scene";
+import Scene from "./scene/Scene";
+
 class CanvasEngine {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D | null = null;
+  private scene = new Scene();
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
   }
@@ -14,6 +19,22 @@ class CanvasEngine {
       throw new Error("Failed to get 2D rendering context.");
     }
 
+    const rect: Rectangle = {
+      id: crypto.randomUUID(),
+      type: "rectangle",
+
+      x: 50,
+      y: 50,
+
+      width: 200,
+      height: 120,
+
+      strokeColor: "#000",
+      fillColor: "#ff0000",
+      strokeWidth: 2,
+    };
+
+    this.scene.addShape(rect);
     this.resizeCanvas();
     this.attachEventListeners();
     this.render();
@@ -32,20 +53,26 @@ class CanvasEngine {
   };
 
   private clearCanvas() {
-    this.ctx?.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    if (!this.ctx) return;
+
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
   }
   private render() {
     if (!this.ctx) return;
-    this.clearCanvas();
-    this.ctx.fillStyle = "rgb(200 0 0)";
-    this.ctx.fillRect(10, 10, 50, 50);
 
-    this.ctx.beginPath();
-    this.ctx.moveTo(75, 50);
-    this.ctx.lineTo(100, 75);
-    this.ctx.lineTo(100, 25);
-    this.ctx.fill();
-    this.ctx.closePath();
+    this.clearCanvas();
+
+    const shapes = this.scene.getShapes();
+
+    for (const shape of shapes) {
+      switch (shape.type) {
+        case "rectangle":
+          shape.fillColor;
+          shape.width;
+          shape.height;
+          break;
+      }
+    }
   }
   destroy() {
     window.removeEventListener("resize", this.handleResize);
