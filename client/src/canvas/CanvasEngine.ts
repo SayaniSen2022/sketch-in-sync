@@ -1,10 +1,21 @@
-import type { Rectangle } from "./scene";
+import RectangleTool from "./editor/tools/RectangleTool";
 import Scene from "./scene/Scene";
+import CanvasRenderer from "./CanvasRenderer";
+import EditorState from "./editor/EditorState";
+import type { ToolStrategy } from "./editor/tools/ToolStrategy";
+import type { Tool } from "./editor/Tool";
+import EllipseTool from "./editor/tools/EllipseTool";
+import LineTool from "./editor/tools/LineTool";
+import ArrowTool from "./editor/tools/ArrowTool";
 
 class CanvasEngine {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D | null = null;
   private scene = new Scene();
+  private renderer!: CanvasRenderer;
+  private editor = new EditorState();
+  private tools!: Record<Tool, ToolStrategy>;
+  private activeTool!: ToolStrategy;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -19,25 +30,26 @@ class CanvasEngine {
       throw new Error("Failed to get 2D rendering context.");
     }
 
-    const rect: Rectangle = {
-      id: crypto.randomUUID(),
-      type: "rectangle",
+    this.renderer = new CanvasRenderer(this.ctx);
+    this.tools = {
+      rectangle: new RectangleTool(this.scene, this.editor),
 
-      x: 50,
-      y: 50,
+      ellipse: new EllipseTool(this.scene, this.editor),
 
-      width: 200,
-      height: 120,
+      line: new LineTool(this.scene, this.editor),
+      arrow: new ArrowTool(this.scene, this.editor),
 
-      strokeColor: "#000",
-      fillColor: "#ff0000",
-      strokeWidth: 2,
+      // select: new SelectTool(this.scene, this.editor),
     };
-
-    this.scene.addShape(rect);
+    this.activeTool = this.tools[this.editor.currentTool];
     this.resizeCanvas();
     this.attachEventListeners();
     this.render();
+  }
+
+  public setTool(tool: Tool) {
+    this.editor.currentTool = tool;
+    this.activeTool = this.tools[tool];
   }
 
   private resizeCanvas() {
@@ -46,36 +58,47 @@ class CanvasEngine {
   }
   private attachEventListeners() {
     window.addEventListener("resize", this.handleResize);
+    this.canvas.addEventListener("mousedown", this.handleMouseDown);
+    this.canvas.addEventListener("mousemove", this.handleMouseMove);
+    window.addEventListener("mouseup", this.handleMouseUp);
   }
+  private handleMouseDown = (event: MouseEvent) => {
+    this.activeTool.onMouseDown(event);
+    this.execute(() => this.activeTool.onMouseDown(event));
+    // console.log("Mouse down");
+    // console.log(this.scene.getShapes());
+  };
+
+  private handleMouseMove = (event: MouseEvent) => {
+    this.activeTool.onMouseMove(event);
+    this.execute(() => this.activeTool.onMouseMove(event));
+  };
+
+  private handleMouseUp = (event: MouseEvent) => {
+    this.activeTool.onMouseUp(event);
+    this.execute(() => this.activeTool.onMouseUp(event));
+  };
+
+  private execute(action: () => void) {
+    action();
+    this.render();
+  }
+
+  // private selectShape(event: MouseEvent) {}
+  // private dragSelection(event: MouseEvent) {}
+
   private handleResize = () => {
     this.resizeCanvas();
     this.render();
   };
-
-  private clearCanvas() {
-    if (!this.ctx) return;
-
-    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-  }
   private render() {
-    if (!this.ctx) return;
-
-    this.clearCanvas();
-
-    const shapes = this.scene.getShapes();
-
-    for (const shape of shapes) {
-      switch (shape.type) {
-        case "rectangle":
-          shape.fillColor;
-          shape.width;
-          shape.height;
-          break;
-      }
-    }
+    this.renderer.render(this.scene);
   }
   destroy() {
     window.removeEventListener("resize", this.handleResize);
+    this.canvas.removeEventListener("mousedown", this.handleMouseDown);
+    this.canvas.removeEventListener("mousemove", this.handleMouseMove);
+    window.removeEventListener("mouseup", this.handleMouseUp);
   }
 }
 

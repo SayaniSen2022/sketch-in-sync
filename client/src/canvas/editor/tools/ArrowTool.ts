@@ -1,0 +1,49 @@
+import Scene from "@/canvas/scene/Scene";
+import EditorState from "../EditorState";
+import type { ToolStrategy } from "./ToolStrategy";
+import type { Arrow } from "@/canvas/scene";
+
+class ArrowTool implements ToolStrategy {
+  private readonly scene: Scene;
+  private readonly editor: EditorState;
+  constructor(scene: Scene, editor: EditorState) {
+    this.scene = scene;
+    this.editor = editor;
+  }
+
+  onMouseDown(event: MouseEvent): void {
+    const arrow: Arrow = {
+      id: crypto.randomUUID(),
+      type: "arrow",
+
+      x1: event.offsetX,
+      y1: event.offsetY,
+
+      x2: event.offsetX,
+      y2: event.offsetY,
+
+      strokeColor: "#fff",
+      strokeWidth: 2,
+    };
+
+    this.scene.addShape(arrow);
+    this.editor.startDrawing(arrow);
+  }
+
+  onMouseMove(event: MouseEvent): void {
+    if (!this.editor.isDrawing) return;
+
+    const shape = this.editor.currentShape;
+
+    if (!shape || shape.type !== "arrow") return;
+
+    shape.x2 = event.offsetX;
+    shape.y2 = event.offsetY;
+  }
+
+  onMouseUp(): void {
+    this.editor.finishDrawing();
+  }
+}
+
+export default ArrowTool;
