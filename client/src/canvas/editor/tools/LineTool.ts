@@ -22,7 +22,7 @@ class LineTool implements ToolStrategy {
       x2: event.offsetX,
       y2: event.offsetY,
 
-      strokeColor: "#fff",
+      strokeColor: "#000",
       strokeWidth: 2,
     };
 

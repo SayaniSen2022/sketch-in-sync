@@ -7,6 +7,7 @@ import type { Tool } from "./editor/Tool";
 import EllipseTool from "./editor/tools/EllipseTool";
 import LineTool from "./editor/tools/LineTool";
 import ArrowTool from "./editor/tools/ArrowTool";
+import SelectTool from "./editor/tools/SelectTool";
 
 class CanvasEngine {
   private canvas: HTMLCanvasElement;
@@ -39,7 +40,7 @@ class CanvasEngine {
       line: new LineTool(this.scene, this.editor),
       arrow: new ArrowTool(this.scene, this.editor),
 
-      // select: new SelectTool(this.scene, this.editor),
+      select: new SelectTool(this.scene, this.editor),
     };
     this.activeTool = this.tools[this.editor.currentTool];
     this.resizeCanvas();
@@ -92,7 +93,7 @@ class CanvasEngine {
     this.render();
   };
   private render() {
-    this.renderer.render(this.scene);
+    this.renderer.render(this.scene, this.editor);
   }
   destroy() {
     window.removeEventListener("resize", this.handleResize);

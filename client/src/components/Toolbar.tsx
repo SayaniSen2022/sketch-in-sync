@@ -16,7 +16,7 @@ const TOOLS: { tool: Tool; label: string }[] = [
 
 export default function Toolbar({ currentTool, onToolChange }: ToolbarProps) {
   return (
-    <nav className="flex gap-2 p-2 text-white justify-center">
+    <nav className="flex gap-2 align-items-center p-4 border border-white/10 rounded rounded-3xl shadow-xl mb-4 w-1/2 mx-auto text-white justify-center bg-gray-700">
       {TOOLS.map(({ tool, label }) => (
         <button
           key={tool}

@@ -21,6 +21,9 @@ class EditorState {
     this.currentShape = null;
     this.isDrawing = false;
   }
+  setSelectedShape(shape: CanvasShape | null) {
+    this.selectedShape = shape;
+  }
 }
 
 export default EditorState;

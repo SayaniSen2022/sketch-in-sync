@@ -32,11 +32,11 @@ const Canvas = () => {
   };
 
   return (
-    <>
+    <div className="bg-neutral-900">
       <Toolbar currentTool={tool} onToolChange={handleToolChange} />
 
       <canvas className="border border-red-500 w-full h-full" ref={canvasRef} />
-    </>
+    </div>
   );
 };
 

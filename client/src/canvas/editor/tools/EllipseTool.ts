@@ -23,7 +23,7 @@ class EllipseTool implements ToolStrategy {
       height: 0,
 
       strokeColor: "#000",
-      fillColor: "#fff",
+      fillColor: "#000",
       strokeWidth: 2,
     };
 
