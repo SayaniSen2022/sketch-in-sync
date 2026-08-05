@@ -6,6 +6,11 @@ class EditorState {
   isDrawing = false;
   selectedShape: CanvasShape | null = null;
   currentShape: CanvasShape | null = null;
+  isDragging: boolean = false;
+  dragStartX: number = 0;
+  dragStartY: number = 0;
+  dragOffsetX: number = 0;
+  dragOffsetY: number = 0;
 
   setTool(tool: Tool) {
     this.currentTool = tool;
@@ -23,6 +28,18 @@ class EditorState {
   }
   setSelectedShape(shape: CanvasShape | null) {
     this.selectedShape = shape;
+  }
+  startDragging(x: number, y: number) {
+    this.isDragging = true;
+
+    this.dragStartX = x;
+    this.dragStartY = y;
+
+    this.dragOffsetX = x;
+    this.dragOffsetY = y;
+  }
+  stopDragging() {
+    this.isDragging = false;
   }
 }
 

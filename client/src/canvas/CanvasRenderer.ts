@@ -117,7 +117,7 @@ class CanvasRenderer {
   private drawSelection(shape: CanvasShape): void {
     switch (shape.type) {
       case "rectangle":
-        this.drawDashedRectangle(shape);
+        this.drawRectangleSelection(shape);
         break;
 
       case "ellipse":
@@ -133,35 +133,48 @@ class CanvasRenderer {
         break;
     }
   }
-  private drawDashedRectangle(dashedRect: Rectangle): void {
+  private drawSelectionBox(left: number, top: number, width: number, height: number): void {
     this.ctx.save();
 
     this.ctx.strokeStyle = "#4EA8FF";
-    this.ctx.lineWidth = 1;
-    this.ctx.setLineDash([5, 5]);
+    this.ctx.lineWidth = 2;
+    this.ctx.setLineDash([]);
 
-    const left = Math.min(dashedRect.x, dashedRect.x + dashedRect.width);
-    const top = Math.min(dashedRect.y, dashedRect.y + dashedRect.height);
+    this.ctx.strokeRect(left, top, width, height);
 
-    this.ctx.strokeRect(left, top, Math.abs(dashedRect.width), Math.abs(dashedRect.height));
+    this.drawHandle(left, top);
+    this.drawHandle(left + width, top);
+    this.drawHandle(left, top + height);
+    this.drawHandle(left + width, top + height);
 
     this.ctx.restore();
   }
-  private drawEllipseSelection(ellipse: Ellipse): void {
-    this.ctx.save();
+  private drawHandle(x: number, y: number): void {
+    const size = 8;
 
+    this.ctx.beginPath();
+    this.ctx.fillStyle = "#ffffff";
     this.ctx.strokeStyle = "#4EA8FF";
-    this.ctx.lineWidth = 1;
-    this.ctx.setLineDash([5, 5]);
+    this.ctx.lineWidth = 2;
 
+    this.ctx.rect(x - size / 2, y - size / 2, size, size);
+
+    this.ctx.fill();
+    this.ctx.stroke();
+  }
+  private drawRectangleSelection(rect: Rectangle): void {
+    const left = Math.min(rect.x, rect.x + rect.width);
+    const top = Math.min(rect.y, rect.y + rect.height);
+
+    this.drawSelectionBox(left, top, Math.abs(rect.width), Math.abs(rect.height));
+  }
+  private drawEllipseSelection(ellipse: Ellipse): void {
     const left = Math.min(ellipse.x, ellipse.x + ellipse.width);
     const top = Math.min(ellipse.y, ellipse.y + ellipse.height);
 
-    this.ctx.strokeRect(left, top, Math.abs(ellipse.width), Math.abs(ellipse.height));
-
-    this.ctx.restore();
+    this.drawSelectionBox(left, top, Math.abs(ellipse.width), Math.abs(ellipse.height));
   }
-  private drawHandle(x: number, y: number, filled = false): void {
+  private drawLineHandle(x: number, y: number, filled = false): void {
     this.ctx.save();
 
     this.ctx.beginPath();
@@ -185,17 +198,17 @@ class CanvasRenderer {
     const midX = (line.x1 + line.x2) / 2;
     const midY = (line.y1 + line.y2) / 2;
 
-    this.drawHandle(line.x1, line.y1);
-    this.drawHandle(midX, midY, true);
-    this.drawHandle(line.x2, line.y2);
+    this.drawLineHandle(line.x1, line.y1);
+    this.drawLineHandle(midX, midY, true);
+    this.drawLineHandle(line.x2, line.y2);
   }
   private drawArrowSelection(arrow: Arrow): void {
     const midX = (arrow.x1 + arrow.x2) / 2;
     const midY = (arrow.y1 + arrow.y2) / 2;
 
-    this.drawHandle(arrow.x1, arrow.y1);
-    this.drawHandle(midX, midY, true);
-    this.drawHandle(arrow.x2, arrow.y2);
+    this.drawLineHandle(arrow.x1, arrow.y1);
+    this.drawLineHandle(midX, midY, true);
+    this.drawLineHandle(arrow.x2, arrow.y2);
   }
 }
 export default CanvasRenderer;

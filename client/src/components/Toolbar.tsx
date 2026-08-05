@@ -16,12 +16,13 @@ const TOOLS: { tool: Tool; label: string }[] = [
 
 export default function Toolbar({ currentTool, onToolChange }: ToolbarProps) {
   return (
-    <nav className="flex gap-2 align-items-center p-4 border border-white/10 rounded rounded-3xl shadow-xl mb-4 w-1/2 mx-auto text-white justify-center bg-gray-700">
+    <nav className=" absolute top-2 left-1/2 -translate-x-1/2 flex justify-center gap-2 w-1/4 p-2 border border-white/10 rounded rounded-lg shadow-xl text-white bg-gray-700">
       {TOOLS.map(({ tool, label }) => (
         <button
           key={tool}
           onClick={() => onToolChange(tool)}
           className={currentTool === tool ? "active" : ""}
+          style={{ cursor: "pointer", padding: "0 5px" }}
         >
           {label}
         </button>

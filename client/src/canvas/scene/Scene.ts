@@ -94,6 +94,33 @@ class Scene {
 
     return Math.hypot(px - nearestX, py - nearestY) <= tolerance;
   }
+  moveShape(shape: CanvasShape, dx: number, dy: number) {
+    switch (shape.type) {
+      case "rectangle":
+        shape.x += dx;
+        shape.y += dy;
+        break;
+
+      case "ellipse":
+        shape.x += dx;
+        shape.y += dy;
+        break;
+
+      case "line":
+        shape.x1 += dx;
+        shape.y1 += dy;
+        shape.x2 += dx;
+        shape.y2 += dy;
+        break;
+
+      case "arrow":
+        shape.x1 += dx;
+        shape.y1 += dy;
+        shape.x2 += dx;
+        shape.y2 += dy;
+        break;
+    }
+  }
   clear() {
     this.shapes = [];
   }
