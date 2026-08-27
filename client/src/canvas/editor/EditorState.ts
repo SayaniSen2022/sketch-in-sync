@@ -11,6 +11,8 @@ class EditorState {
   dragStartY: number = 0;
   dragOffsetX: number = 0;
   dragOffsetY: number = 0;
+  isResizing: boolean = false;
+  resizeHandle: string | null = null;
 
   setTool(tool: Tool) {
     this.currentTool = tool;
@@ -40,6 +42,14 @@ class EditorState {
   }
   stopDragging() {
     this.isDragging = false;
+  }
+  startResizing(handle: string): void {
+    this.isResizing = true;
+    this.resizeHandle = handle;
+  }
+  stopResizing() {
+    this.isResizing = false;
+    this.resizeHandle = null;
   }
 }
 
