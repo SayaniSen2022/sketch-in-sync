@@ -2,6 +2,8 @@ import type { CanvasShape, Rectangle } from "./scene";
 import type { Ellipse } from "./scene/Ellipse";
 import type { Line } from "./scene";
 import type { Arrow } from "./scene";
+import type { Pencil } from "./scene";
+import type { Text } from "./scene";
 import Scene from "./scene/Scene";
 import type EditorState from "./editor/EditorState";
 
@@ -27,6 +29,13 @@ class CanvasRenderer {
           break;
         case "arrow":
           this.drawArrow(shape);
+          break;
+        case "pencil":
+          this.drawPencil(shape);
+          break;
+
+        case "text":
+          this.drawText(shape);
           break;
       }
       if (shape === editor.selectedShape) {
@@ -209,6 +218,34 @@ class CanvasRenderer {
     this.drawLineHandle(arrow.x1, arrow.y1);
     this.drawLineHandle(midX, midY, true);
     this.drawLineHandle(arrow.x2, arrow.y2);
+  }
+  private drawPencil(pencil: Pencil): void {
+    if (pencil.points.length < 2) return;
+
+    this.ctx.strokeStyle = pencil.strokeColor;
+    this.ctx.lineWidth = pencil.strokeWidth;
+
+    this.ctx.beginPath();
+
+    this.ctx.moveTo(pencil.points[0].x, pencil.points[0].y);
+
+    for (let i = 1; i < pencil.points.length; i++) {
+      this.ctx.lineTo(pencil.points[i].x, pencil.points[i].y);
+    }
+
+    this.ctx.stroke();
+    this.ctx.closePath();
+  }
+  private drawText(text: Text): void {
+    this.ctx.save();
+    this.ctx.fillStyle = text.fillColor;
+
+    this.ctx.font = `${text.fontSize}px ${text.fontFamily}`;
+
+    this.ctx.textBaseline = "top";
+
+    this.ctx.fillText(text.text, text.x, text.y);
+    this.ctx.restore();
   }
 }
 export default CanvasRenderer;

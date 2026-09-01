@@ -5,3 +5,5 @@ export * from "./types";
 export * from "./Ellipse";
 export * from "./Line";
 export * from "./Arrow";
+export * from "./Text";
+export * from "./Pencil";

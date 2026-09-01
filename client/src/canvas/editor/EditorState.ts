@@ -13,6 +13,12 @@ class EditorState {
   dragOffsetY: number = 0;
   isResizing: boolean = false;
   resizeHandle: string | null = null;
+  textEditing = false;
+
+  textX = 0;
+  textY = 0;
+
+  textValue = "";
 
   setTool(tool: Tool) {
     this.currentTool = tool;
@@ -50,6 +56,27 @@ class EditorState {
   stopResizing() {
     this.isResizing = false;
     this.resizeHandle = null;
+  }
+  private onChange: (() => void) | null = null;
+
+  setOnChange(callback: () => void) {
+    this.onChange = callback;
+  }
+  startTextEditing(x: number, y: number) {
+    this.textEditing = true;
+    this.textX = x;
+    this.textY = y;
+    this.textValue = "";
+    this.onChange?.();
+  }
+  updateTextValue(value: string) {
+    this.textValue = value;
+    this.onChange?.();
+  }
+
+  finishTextEditing() {
+    this.textEditing = false;
+    this.onChange?.();
   }
 }
 

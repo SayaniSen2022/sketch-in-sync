@@ -119,6 +119,18 @@ class Scene {
         shape.x2 += dx;
         shape.y2 += dy;
         break;
+
+      case "pencil":
+        shape.points.forEach((point) => {
+          point.x += dx;
+          point.y += dy;
+        });
+        break;
+
+      case "text":
+        shape.x += dx;
+        shape.y += dy;
+        break;
     }
   }
   clear() {
