@@ -18,7 +18,7 @@ const TOOLS: { tool: Tool; label: string }[] = [
 
 export default function Toolbar({ currentTool, onToolChange }: ToolbarProps) {
   return (
-    <nav className=" absolute top-2 left-1/2 -translate-x-1/2 flex justify-center gap-2 w-1/2 p-2 border border-white/10 rounded rounded-lg shadow-xl text-white bg-gray-700">
+    <nav className="absolute z-100 cursor-pointer top-2 left-1/2 -translate-x-1/2 flex justify-center gap-2 p-2 border border-white/10 rounded rounded-lg shadow-xl text-white bg-neutral-800">
       {TOOLS.map(({ tool, label }) => (
         <button
           key={tool}

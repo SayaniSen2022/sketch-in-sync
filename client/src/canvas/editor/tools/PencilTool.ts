@@ -23,7 +23,7 @@ class PencilTool implements ToolStrategy {
           y: event.offsetY,
         },
       ],
-      strokeColor: "#000000",
+      strokeColor: "#fff",
       strokeWidth: 2,
     };
 

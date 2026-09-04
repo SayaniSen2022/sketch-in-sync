@@ -130,7 +130,7 @@ class CanvasEngine {
     this.render();
   };
 
-  private render() {
+  public render() {
     this.renderer.render(this.scene, this.editor);
   }
 

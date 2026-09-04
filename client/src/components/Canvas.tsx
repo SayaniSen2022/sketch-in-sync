@@ -1,6 +1,5 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { Tool } from "@/canvas/editor/Tool";
-import { useRef, useEffect } from "react";
 import CanvasEngine from "../canvas/CanvasEngine";
 import Toolbar from "./Toolbar";
 import EditorState from "@/canvas/editor/EditorState";
@@ -12,6 +11,17 @@ const Canvas = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<CanvasEngine | null>(null);
   const [tool, setTool] = useState<Tool>("rectangle");
+
+  const textInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!editor?.textEditing) return;
+
+    requestAnimationFrame(() => {
+      textInputRef.current?.focus();
+      console.log("FOCUSED:", document.activeElement === textInputRef.current);
+    });
+  }, [editor?.textEditing]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -26,6 +36,7 @@ const Canvas = () => {
 
     editorState.setOnChange(() => {
       forceUpdate((value) => value + 1);
+      engine.render();
     });
 
     setEditor(editorState);
@@ -40,12 +51,16 @@ const Canvas = () => {
     engineRef.current?.setTool(tool);
   };
 
+  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    editor?.updateTextValue(e.target.value);
+  };
+
   return (
-    <div>
+    <div className="relative w-screen h-screen overflow-hidden bg-neutral-900">
       <Toolbar currentTool={tool} onToolChange={handleToolChange} />
 
       <canvas
-        className={`w-full h-full ${
+        className={`absolute inset-0w-full h-full ${
           tool === "select"
             ? "cursor-default"
             : tool === "text"
@@ -54,33 +69,22 @@ const Canvas = () => {
         }`}
         ref={canvasRef}
       />
-      {editor?.textEditing && (
-        <textarea
-          autoFocus
-          value={editor.textValue}
-          onChange={(e) => editor.updateTextValue(e.target.value)}
 
-          style={{
-            position: "absolute",
-            left: editor.textX,
-            top: editor.textY,
-
-            // Important for making it look like text is being
-            // typed directly on the canvas
-            fontSize: "20px",
-            fontFamily: "Arial",
-            lineHeight: "1.2",
-
-            border: "none",
-            outline: "none",
-            resize: "none",
-            background: "transparent",
-
-            padding: 0,
-            margin: 0,
-          }}
-        />
-      )}
+      <input
+        ref={textInputRef}
+        value={editor?.textValue ?? ""}
+        onChange={handleTextChange}
+        style={{
+          position: "fixed",
+          left: editor?.textX ?? 0,
+          top: editor?.textY ?? 0,
+          width: 1,
+          height: 1,
+          opacity: 0,
+          zIndex: 9999,
+        }}
+        name="text-val"
+      />
     </div>
   );
 };

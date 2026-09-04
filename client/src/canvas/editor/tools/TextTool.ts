@@ -36,7 +36,7 @@ class TextTool implements ToolStrategy {
       text: this.editor.textValue,
       fontSize: 20,
       fontFamily: "Arial",
-      fillColor: "#000000",
+      fillColor: "#fff",
     };
 
     this.scene.addShape(textShape);

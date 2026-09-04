@@ -16,6 +16,7 @@ class CanvasRenderer {
     this.clearCanvas();
 
     const shapes = scene.getShapes();
+
     for (const shape of shapes) {
       switch (shape.type) {
         case "rectangle":
@@ -41,6 +42,9 @@ class CanvasRenderer {
       if (shape === editor.selectedShape) {
         this.drawSelection(shape);
       }
+    }
+    if (editor.textEditing) {
+      this.drawEditingText(editor);
     }
   }
 
@@ -245,6 +249,19 @@ class CanvasRenderer {
     this.ctx.textBaseline = "top";
 
     this.ctx.fillText(text.text, text.x, text.y);
+    this.ctx.restore();
+  }
+  private drawEditingText(editor: EditorState) {
+    if (!editor.textEditing) return;
+
+    this.ctx.save();
+
+    this.ctx.font = `20px Arial`;
+    this.ctx.textBaseline = "top";
+    this.ctx.fillStyle = "#fff";
+
+    this.ctx.fillText(editor.textValue, editor.textX, editor.textY);
+
     this.ctx.restore();
   }
 }

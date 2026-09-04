@@ -22,7 +22,7 @@ class ArrowTool implements ToolStrategy {
       x2: event.offsetX,
       y2: event.offsetY,
 
-      strokeColor: "#000",
+      strokeColor: "#fff",
       strokeWidth: 2,
     };
 
