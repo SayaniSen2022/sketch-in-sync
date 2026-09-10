@@ -9,10 +9,12 @@ import type EditorState from "./editor/EditorState";
 
 class CanvasRenderer {
   private ctx: CanvasRenderingContext2D;
+  private scene: Scene | null = null;
   constructor(ctx: CanvasRenderingContext2D) {
     this.ctx = ctx;
   }
   render(scene: Scene, editor: EditorState): void {
+    this.scene = scene;
     this.clearCanvas();
 
     const shapes = scene.getShapes();
@@ -42,9 +44,6 @@ class CanvasRenderer {
       if (shape === editor.selectedShape) {
         this.drawSelection(shape);
       }
-    }
-    if (editor.textEditing) {
-      this.drawEditingText(editor);
     }
   }
 
@@ -144,7 +143,23 @@ class CanvasRenderer {
       case "arrow":
         this.drawArrowSelection(shape);
         break;
+
+      case "text":
+        this.drawTextSelection(shape);
+        break;
     }
+  }
+  private drawTextSelection(text: Text): void {
+    if (!this.scene) return;
+
+    const bounds = this.scene.getTextBounds(text);
+
+    this.drawSelectionBox(
+      bounds.left,
+      bounds.top,
+      bounds.right - bounds.left,
+      bounds.bottom - bounds.top,
+    );
   }
   private drawSelectionBox(left: number, top: number, width: number, height: number): void {
     this.ctx.save();
@@ -240,6 +255,13 @@ class CanvasRenderer {
     this.ctx.stroke();
     this.ctx.closePath();
   }
+  private drawTextLines(text: string, x: number, y: number, lineHeight: number): void {
+    const lines = text.split("\n");
+
+    for (let i = 0; i < lines.length; i++) {
+      this.ctx.fillText(lines[i], x, y + i * lineHeight);
+    }
+  }
   private drawText(text: Text): void {
     this.ctx.save();
     this.ctx.fillStyle = text.fillColor;
@@ -248,20 +270,7 @@ class CanvasRenderer {
 
     this.ctx.textBaseline = "top";
 
-    this.ctx.fillText(text.text, text.x, text.y);
-    this.ctx.restore();
-  }
-  private drawEditingText(editor: EditorState) {
-    if (!editor.textEditing) return;
-
-    this.ctx.save();
-
-    this.ctx.font = `20px Arial`;
-    this.ctx.textBaseline = "top";
-    this.ctx.fillStyle = "#fff";
-
-    this.ctx.fillText(editor.textValue, editor.textX, editor.textY);
-
+    this.drawTextLines(text.text, text.x, text.y, text.fontSize);
     this.ctx.restore();
   }
 }

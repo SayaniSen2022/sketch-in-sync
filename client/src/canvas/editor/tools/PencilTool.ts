@@ -1,13 +1,14 @@
 import Scene from "@/canvas/scene/Scene";
 import EditorState from "../EditorState";
-import type { ToolStrategy } from "./ToolStrategy";
+import { ToolStrategy } from "./ToolStrategy";
 import type { Pencil } from "@/canvas/scene";
 
-class PencilTool implements ToolStrategy {
+class PencilTool extends ToolStrategy {
   private readonly scene: Scene;
   private readonly editor: EditorState;
 
   constructor(scene: Scene, editor: EditorState) {
+    super();
     this.scene = scene;
     this.editor = editor;
   }

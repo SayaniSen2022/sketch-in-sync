@@ -1,18 +1,21 @@
 import Scene from "@/canvas/scene/Scene";
 import EditorState from "../EditorState";
-import type { ToolStrategy } from "./ToolStrategy";
+import { ToolStrategy } from "./ToolStrategy";
 import type { Text } from "@/canvas/scene";
 
-class TextTool implements ToolStrategy {
+class TextTool extends ToolStrategy {
   private readonly scene: Scene;
   private readonly editor: EditorState;
 
   constructor(scene: Scene, editor: EditorState) {
+    super();
     this.scene = scene;
     this.editor = editor;
   }
 
   onMouseDown(event: MouseEvent): void {
+    // Commit the in-progress draft, then start a fresh editing session here.
+    this.commitText();
     this.editor.startTextEditing(event.offsetX, event.offsetY);
   }
 
@@ -20,7 +23,9 @@ class TextTool implements ToolStrategy {
 
   onMouseUp(): void {}
 
-  private finishText() {
+  commitText() {
+    if (!this.editor.textEditing) return;
+
     const text = this.editor.textValue.trim();
 
     if (!text) {
@@ -34,8 +39,8 @@ class TextTool implements ToolStrategy {
       x: this.editor.textX,
       y: this.editor.textY,
       text: this.editor.textValue,
-      fontSize: 20,
-      fontFamily: "Arial",
+      fontSize: this.editor.textFontSize,
+      fontFamily: this.editor.textFontFamily,
       fillColor: "#fff",
     };
 

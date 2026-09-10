@@ -1,12 +1,13 @@
-import type { ToolStrategy } from "./ToolStrategy";
+import { ToolStrategy } from "./ToolStrategy";
 import Scene from "@/canvas/scene/Scene";
 import EditorState from "../EditorState";
 import type { CanvasShape } from "@/canvas/scene";
 
-class SelectTool implements ToolStrategy {
+class SelectTool extends ToolStrategy {
   private scene: Scene;
   private editor: EditorState;
   constructor(scene: Scene, editor: EditorState) {
+    super();
     this.scene = scene;
     this.editor = editor;
   }
@@ -70,6 +71,18 @@ class SelectTool implements ToolStrategy {
     if (this.editor.isDragging) {
       this.editor.stopDragging();
     }
+  }
+
+  /** Double-click a text shape to re-enter editing mode for it. */
+  onDoubleClick(event: MouseEvent): void {
+    const shape = this.scene.findShapeAt(event.offsetX, event.offsetY);
+
+    if (!shape || shape.type !== "text") return;
+
+    this.scene.removeShape(shape);
+    this.editor.clearSelection();
+    this.editor.startTextEditing(shape.x, shape.y);
+    this.editor.updateTextValue(shape.text);
   }
 
   private getResizeHandle(x: number, y: number, shape: CanvasShape): string | null {

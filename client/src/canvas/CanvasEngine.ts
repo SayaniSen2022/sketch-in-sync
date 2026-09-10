@@ -69,8 +69,19 @@ class CanvasEngine {
       return;
     }
 
+    // Let the current tool finish in-progress work before switching away.
+    this.activeTool.commitText();
+
     this.editor.setTool(tool);
     this.activeTool = nextTool;
+    this.render();
+  }
+
+  /**
+   * Commits the active tool's in-progress work (e.g. the text draft), if any.
+   */
+  public finishTextEditing() {
+    this.activeTool.commitText();
   }
 
   /**
@@ -100,6 +111,8 @@ class CanvasEngine {
     this.canvas.addEventListener("mousemove", this.handleMouseMove);
 
     window.addEventListener("mouseup", this.handleMouseUp);
+
+    this.canvas.addEventListener("dblclick", this.handleDoubleClick);
   }
 
   private handleMouseDown = (event: MouseEvent) => {
@@ -120,6 +133,12 @@ class CanvasEngine {
     });
   };
 
+  private handleDoubleClick = (event: MouseEvent) => {
+    this.execute(() => {
+      this.activeTool.onDoubleClick(event);
+    });
+  };
+
   private execute(action: () => void) {
     action();
     this.render();
@@ -135,6 +154,8 @@ class CanvasEngine {
   }
 
   destroy() {
+    this.activeTool.commitText();
+
     window.removeEventListener("resize", this.handleResize);
 
     this.canvas.removeEventListener("mousedown", this.handleMouseDown);
@@ -142,6 +163,8 @@ class CanvasEngine {
     this.canvas.removeEventListener("mousemove", this.handleMouseMove);
 
     window.removeEventListener("mouseup", this.handleMouseUp);
+
+    this.canvas.removeEventListener("dblclick", this.handleDoubleClick);
   }
 }
 

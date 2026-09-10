@@ -1,6 +1,9 @@
 import type { Tool } from "./Tool";
 import type { CanvasShape } from "../scene";
 
+export const DEFAULT_TEXT_FONT_SIZE = 20;
+export const DEFAULT_TEXT_FONT_FAMILY = "Arial";
+
 class EditorState {
   currentTool: Tool = "rectangle";
   isDrawing = false;
@@ -19,6 +22,8 @@ class EditorState {
   textY = 0;
 
   textValue = "";
+  textFontSize = DEFAULT_TEXT_FONT_SIZE;
+  textFontFamily = DEFAULT_TEXT_FONT_FAMILY;
 
   setTool(tool: Tool) {
     this.currentTool = tool;

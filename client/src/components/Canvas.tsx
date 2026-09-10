@@ -12,16 +12,27 @@ const Canvas = () => {
   const engineRef = useRef<CanvasEngine | null>(null);
   const [tool, setTool] = useState<Tool>("rectangle");
 
-  const textInputRef = useRef<HTMLInputElement>(null);
+  const textInputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (!editor?.textEditing) return;
 
     requestAnimationFrame(() => {
       textInputRef.current?.focus();
-      console.log("FOCUSED:", document.activeElement === textInputRef.current);
     });
-  }, [editor?.textEditing]);
+  }, [editor?.textEditing, editor?.textX, editor?.textY]);
+
+  // Grow the textarea to fit its content; the DOM renders the draft while editing.
+  useEffect(() => {
+    const textarea = textInputRef.current;
+
+    if (!editor?.textEditing || !textarea) return;
+
+    textarea.style.width = "4px";
+    textarea.style.height = `${editor.textFontSize}px`;
+    textarea.style.width = `${textarea.scrollWidth + 4}px`;
+    textarea.style.height = `${textarea.scrollHeight + 4}px`;
+  }, [editor?.textEditing, editor?.textValue, editor?.textFontSize, editor?.textFontFamily]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -51,8 +62,20 @@ const Canvas = () => {
     engineRef.current?.setTool(tool);
   };
 
-  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     editor?.updateTextValue(e.target.value);
+  };
+
+  const handleTextKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Escape") {
+      editor?.finishTextEditing();
+      return;
+    }
+
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      engineRef.current?.finishTextEditing();
+    }
   };
 
   return (
@@ -70,21 +93,35 @@ const Canvas = () => {
         ref={canvasRef}
       />
 
-      <input
-        ref={textInputRef}
-        value={editor?.textValue ?? ""}
-        onChange={handleTextChange}
-        style={{
-          position: "fixed",
-          left: editor?.textX ?? 0,
-          top: editor?.textY ?? 0,
-          width: 1,
-          height: 1,
-          opacity: 0,
-          zIndex: 9999,
-        }}
-        name="text-val"
-      />
+      {editor?.textEditing && (
+        <textarea
+          ref={textInputRef}
+          value={editor.textValue}
+          onChange={handleTextChange}
+          onKeyDown={handleTextKeyDown}
+          onBlur={() => engineRef.current?.finishTextEditing()}
+          style={{
+            position: "fixed",
+            left: editor.textX,
+            top: editor.textY,
+            padding: 0,
+            margin: 0,
+            border: "none",
+            outline: "none",
+            resize: "none",
+            overflow: "hidden",
+            whiteSpace: "pre",
+            background: "transparent",
+            color: "#fff",
+            caretColor: "#fff",
+            fontSize: editor.textFontSize,
+            fontFamily: editor.textFontFamily,
+            lineHeight: `${editor.textFontSize}px`,
+            zIndex: 9999,
+          }}
+          name="text-val"
+        />
+      )}
     </div>
   );
 };
