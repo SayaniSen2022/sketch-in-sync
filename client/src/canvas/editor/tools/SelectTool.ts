@@ -1,11 +1,26 @@
 import { ToolStrategy } from "./ToolStrategy";
 import Scene from "@/canvas/scene/Scene";
 import EditorState from "../EditorState";
-import type { CanvasShape } from "@/canvas/scene";
+import type { CanvasShape, Text } from "@/canvas/scene";
+
+type CornerHandle = "top-left" | "top-right" | "bottom-left" | "bottom-right";
+
+interface TextResizeState {
+  handle: CornerHandle;
+  anchorX: number;
+  anchorY: number;
+  startVectorX: number;
+  startVectorY: number;
+  startFontSize: number;
+}
+
+const MIN_TEXT_FONT_SIZE = 4;
 
 class SelectTool extends ToolStrategy {
   private scene: Scene;
   private editor: EditorState;
+  private textResizeState: TextResizeState | null = null;
+  private editingText: Text | null = null;
   constructor(scene: Scene, editor: EditorState) {
     super();
     this.scene = scene;
@@ -23,6 +38,9 @@ class SelectTool extends ToolStrategy {
       const handle = this.getResizeHandle(x, y, selectedShape);
 
       if (handle) {
+        if (selectedShape.type === "text" && this.isCornerHandle(handle)) {
+          this.startTextResize(selectedShape, handle);
+        }
         this.editor.startResizing(handle);
         return;
       }
@@ -65,6 +83,7 @@ class SelectTool extends ToolStrategy {
   onMouseUp(): void {
     if (this.editor.isResizing) {
       this.editor.stopResizing();
+      this.textResizeState = null;
       return;
     }
 
@@ -79,10 +98,38 @@ class SelectTool extends ToolStrategy {
 
     if (!shape || shape.type !== "text") return;
 
+    const caretIndex = this.scene.getTextCaretIndex(shape, event.offsetX, event.offsetY);
+
     this.scene.removeShape(shape);
     this.editor.clearSelection();
-    this.editor.startTextEditing(shape.x, shape.y);
-    this.editor.updateTextValue(shape.text);
+    this.editingText = shape;
+    this.editor.startTextEditing(shape.x, shape.y, {
+      value: shape.text,
+      fontSize: shape.fontSize,
+      fontFamily: shape.fontFamily,
+      caretIndex,
+    });
+  }
+
+  commitText(): void {
+    if (!this.editor.textEditing || !this.editingText) return;
+
+    const shape = this.editingText;
+    this.editingText = null;
+
+    if (this.editor.textValue.trim()) {
+      shape.x = this.editor.textX;
+      shape.y = this.editor.textY;
+      shape.text = this.editor.textValue;
+      shape.fontSize = this.editor.textFontSize;
+      shape.fontFamily = this.editor.textFontFamily;
+      this.scene.addShape(shape);
+      this.editor.setSelectedShape(shape);
+    } else {
+      this.editor.clearSelection();
+    }
+
+    this.editor.finishTextEditing();
   }
 
   private getResizeHandle(x: number, y: number, shape: CanvasShape): string | null {
@@ -96,6 +143,28 @@ class SelectTool extends ToolStrategy {
 
         const top = Math.min(shape.y, shape.y + shape.height);
         const bottom = Math.max(shape.y, shape.y + shape.height);
+
+        if (Math.abs(x - left) <= handleSize && Math.abs(y - top) <= handleSize) {
+          return "top-left";
+        }
+
+        if (Math.abs(x - right) <= handleSize && Math.abs(y - top) <= handleSize) {
+          return "top-right";
+        }
+
+        if (Math.abs(x - left) <= handleSize && Math.abs(y - bottom) <= handleSize) {
+          return "bottom-left";
+        }
+
+        if (Math.abs(x - right) <= handleSize && Math.abs(y - bottom) <= handleSize) {
+          return "bottom-right";
+        }
+
+        return null;
+      }
+
+      case "text": {
+        const { left, top, right, bottom } = this.scene.getTextBounds(shape);
 
         if (Math.abs(x - left) <= handleSize && Math.abs(y - top) <= handleSize) {
           return "top-left";
@@ -137,10 +206,6 @@ class SelectTool extends ToolStrategy {
     }
   }
   private resizeShape(shape: CanvasShape, x: number, y: number): void {
-    // if (shape.type !== "rectangle" && shape.type !== "ellipse") {
-    //   return;
-    // }
-
     const handle = this.editor.resizeHandle;
 
     if (!handle) return;
@@ -178,6 +243,10 @@ class SelectTool extends ToolStrategy {
         }
         break;
 
+      case "text":
+        this.resizeText(shape, x, y);
+        break;
+
       case "line":
       case "arrow":
         if (handle === "start") {
@@ -191,6 +260,63 @@ class SelectTool extends ToolStrategy {
         }
 
         break;
+    }
+  }
+
+  private isCornerHandle(handle: string): handle is CornerHandle {
+    return ["top-left", "top-right", "bottom-left", "bottom-right"].includes(handle);
+  }
+
+  private startTextResize(text: Text, handle: CornerHandle): void {
+    const { left, top, right, bottom } = this.scene.getTextBounds(text);
+    const [anchorX, anchorY, handleX, handleY] =
+      handle === "top-left"
+        ? [right, bottom, left, top]
+        : handle === "top-right"
+          ? [left, bottom, right, top]
+          : handle === "bottom-left"
+            ? [right, top, left, bottom]
+            : [left, top, right, bottom];
+
+    this.textResizeState = {
+      handle,
+      anchorX,
+      anchorY,
+      startVectorX: handleX - anchorX,
+      startVectorY: handleY - anchorY,
+      startFontSize: text.fontSize,
+    };
+  }
+
+  private resizeText(text: Text, x: number, y: number): void {
+    const state = this.textResizeState;
+
+    if (!state) return;
+
+    const startLengthSquared = state.startVectorX ** 2 + state.startVectorY ** 2;
+
+    if (startLengthSquared === 0) return;
+
+    const scale = Math.max(
+      MIN_TEXT_FONT_SIZE / state.startFontSize,
+      ((x - state.anchorX) * state.startVectorX + (y - state.anchorY) * state.startVectorY) /
+        startLengthSquared,
+    );
+
+    text.fontSize = state.startFontSize * scale;
+
+    const bounds = this.scene.getTextBounds(text);
+
+    if (state.handle === "top-left" || state.handle === "bottom-left") {
+      text.x = state.anchorX - (bounds.right - bounds.left);
+    } else {
+      text.x = state.anchorX;
+    }
+
+    if (state.handle === "top-left" || state.handle === "top-right") {
+      text.y = state.anchorY - (bounds.bottom - bounds.top);
+    } else {
+      text.y = state.anchorY;
     }
   }
 }

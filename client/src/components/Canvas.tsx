@@ -18,9 +18,15 @@ const Canvas = () => {
     if (!editor?.textEditing) return;
 
     requestAnimationFrame(() => {
-      textInputRef.current?.focus();
+      const textarea = textInputRef.current;
+
+      if (!textarea) return;
+
+      textarea.focus();
+      const caretIndex = Math.min(editor.textCaretIndex, textarea.value.length);
+      textarea.setSelectionRange(caretIndex, caretIndex);
     });
-  }, [editor?.textEditing, editor?.textX, editor?.textY]);
+  }, [editor?.textEditing, editor?.textX, editor?.textY, editor?.textCaretIndex]);
 
   // Grow the textarea to fit its content; the DOM renders the draft while editing.
   useEffect(() => {

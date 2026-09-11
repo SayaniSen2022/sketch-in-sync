@@ -4,6 +4,13 @@ import type { CanvasShape } from "../scene";
 export const DEFAULT_TEXT_FONT_SIZE = 20;
 export const DEFAULT_TEXT_FONT_FAMILY = "Arial";
 
+interface TextEditingOptions {
+  value?: string;
+  fontSize?: number;
+  fontFamily?: string;
+  caretIndex?: number;
+}
+
 class EditorState {
   currentTool: Tool = "rectangle";
   isDrawing = false;
@@ -24,6 +31,7 @@ class EditorState {
   textValue = "";
   textFontSize = DEFAULT_TEXT_FONT_SIZE;
   textFontFamily = DEFAULT_TEXT_FONT_FAMILY;
+  textCaretIndex = 0;
 
   setTool(tool: Tool) {
     this.currentTool = tool;
@@ -67,11 +75,14 @@ class EditorState {
   setOnChange(callback: () => void) {
     this.onChange = callback;
   }
-  startTextEditing(x: number, y: number) {
+  startTextEditing(x: number, y: number, options: TextEditingOptions = {}) {
     this.textEditing = true;
     this.textX = x;
     this.textY = y;
-    this.textValue = "";
+    this.textValue = options.value ?? "";
+    this.textFontSize = options.fontSize ?? this.textFontSize;
+    this.textFontFamily = options.fontFamily ?? this.textFontFamily;
+    this.textCaretIndex = options.caretIndex ?? 0;
     this.onChange?.();
   }
   updateTextValue(value: string) {
