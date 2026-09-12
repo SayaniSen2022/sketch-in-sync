@@ -1,5 +1,6 @@
 import type { CanvasShape } from "./types";
 import type { Text } from "./Text";
+import type { Pencil } from "./Pencil";
 
 const measureContext = document.createElement("canvas").getContext("2d");
 
@@ -24,6 +25,35 @@ class Scene {
       top: text.y,
       right: text.x + width,
       bottom: text.y + lines.length * text.fontSize,
+    };
+  }
+
+  getPencilBounds(
+    pencil: Pencil,
+  ): { left: number; top: number; right: number; bottom: number } | null {
+    if (pencil.points.length === 0) return null;
+
+    const firstPoint = pencil.points[0];
+    let left = firstPoint.x;
+    let right = firstPoint.x;
+    let top = firstPoint.y;
+    let bottom = firstPoint.y;
+
+    for (let i = 1; i < pencil.points.length; i++) {
+      const point = pencil.points[i];
+      left = Math.min(left, point.x);
+      right = Math.max(right, point.x);
+      top = Math.min(top, point.y);
+      bottom = Math.max(bottom, point.y);
+    }
+
+    const strokeInset = pencil.strokeWidth / 2;
+
+    return {
+      left: left - strokeInset,
+      top: top - strokeInset,
+      right: right + strokeInset,
+      bottom: bottom + strokeInset,
     };
   }
 
@@ -142,6 +172,13 @@ class Scene {
 
           break;
         }
+        case "pencil": {
+          if (this.isPointNearPencil(x, y, shape)) {
+            return shape;
+          }
+
+          break;
+        }
       }
     }
     return null;
@@ -172,6 +209,27 @@ class Scene {
     const nearestY = y1 + t * dy;
 
     return Math.hypot(px - nearestX, py - nearestY) <= tolerance;
+  }
+  private isPointNearPencil(px: number, py: number, pencil: Pencil): boolean {
+    const tolerance = Math.max(6, pencil.strokeWidth / 2);
+
+    if (pencil.points.length === 0) return false;
+
+    if (pencil.points.length === 1) {
+      const point = pencil.points[0];
+      return Math.hypot(px - point.x, py - point.y) <= tolerance;
+    }
+
+    for (let i = 1; i < pencil.points.length; i++) {
+      const start = pencil.points[i - 1];
+      const end = pencil.points[i];
+
+      if (this.isPointNearLine(px, py, start.x, start.y, end.x, end.y, tolerance)) {
+        return true;
+      }
+    }
+
+    return false;
   }
   moveShape(shape: CanvasShape, dx: number, dy: number) {
     switch (shape.type) {

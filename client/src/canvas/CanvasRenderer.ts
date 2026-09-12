@@ -147,6 +147,10 @@ class CanvasRenderer {
       case "text":
         this.drawTextSelection(shape);
         break;
+
+      case "pencil":
+        this.drawPencilSelection(shape);
+        break;
     }
   }
   private drawTextSelection(text: Text): void {
@@ -201,6 +205,34 @@ class CanvasRenderer {
     const top = Math.min(ellipse.y, ellipse.y + ellipse.height);
 
     this.drawSelectionBox(left, top, Math.abs(ellipse.width), Math.abs(ellipse.height));
+  }
+  private drawPencilSelection(pencil: Pencil): void {
+    if (!this.scene) return;
+
+    const bounds = this.scene.getPencilBounds(pencil);
+
+    if (!bounds) return;
+
+    this.drawSelectionBox(
+      bounds.left,
+      bounds.top,
+      bounds.right - bounds.left,
+      bounds.bottom - bounds.top,
+    );
+
+    const centerX = (bounds.left + bounds.right) / 2;
+    const rotationHandleY = bounds.top - 24;
+
+    this.ctx.save();
+    this.ctx.strokeStyle = "#8B7CFF";
+    this.ctx.lineWidth = 2;
+    this.ctx.beginPath();
+    this.ctx.moveTo(centerX, bounds.top);
+    this.ctx.lineTo(centerX, rotationHandleY);
+    this.ctx.stroke();
+    this.ctx.restore();
+
+    this.drawLineHandle(centerX, rotationHandleY, true);
   }
   private drawLineHandle(x: number, y: number, filled = false): void {
     this.ctx.save();

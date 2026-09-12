@@ -1,7 +1,7 @@
 import { ToolStrategy } from "./ToolStrategy";
 import Scene from "@/canvas/scene/Scene";
 import EditorState from "../EditorState";
-import type { CanvasShape, Text } from "@/canvas/scene";
+import type { CanvasShape, Pencil, Text } from "@/canvas/scene";
 
 type CornerHandle = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
@@ -14,12 +14,35 @@ interface TextResizeState {
   startFontSize: number;
 }
 
+interface PencilResizeState {
+  handle: CornerHandle;
+  anchorX: number;
+  anchorY: number;
+  startVectorX: number;
+  startVectorY: number;
+  startStrokeWidth: number;
+  startPoints: { x: number; y: number }[];
+}
+
+interface PencilRotationState {
+  centerX: number;
+  centerY: number;
+  startAngle: number;
+  startPoints: { x: number; y: number }[];
+}
+
 const MIN_TEXT_FONT_SIZE = 4;
+const MIN_PENCIL_STROKE_WIDTH = 0.5;
+const MIN_PENCIL_SCALE = 0.05;
+const PENCIL_ROTATION_HANDLE_OFFSET = 24;
+const PENCIL_ROTATION_HANDLE_RADIUS = 8;
 
 class SelectTool extends ToolStrategy {
   private scene: Scene;
   private editor: EditorState;
   private textResizeState: TextResizeState | null = null;
+  private pencilResizeState: PencilResizeState | null = null;
+  private pencilRotationState: PencilRotationState | null = null;
   private editingText: Text | null = null;
   constructor(scene: Scene, editor: EditorState) {
     super();
@@ -35,11 +58,20 @@ class SelectTool extends ToolStrategy {
 
     // Check resize handles first
     if (selectedShape) {
+      if (selectedShape.type === "pencil" && this.isPencilRotationHandle(x, y, selectedShape)) {
+        this.startPencilRotation(selectedShape, x, y);
+        this.editor.startResizing("rotate");
+        return;
+      }
+
       const handle = this.getResizeHandle(x, y, selectedShape);
 
       if (handle) {
         if (selectedShape.type === "text" && this.isCornerHandle(handle)) {
           this.startTextResize(selectedShape, handle);
+        }
+        if (selectedShape.type === "pencil" && this.isCornerHandle(handle)) {
+          this.startPencilResize(selectedShape, handle);
         }
         this.editor.startResizing(handle);
         return;
@@ -84,6 +116,8 @@ class SelectTool extends ToolStrategy {
     if (this.editor.isResizing) {
       this.editor.stopResizing();
       this.textResizeState = null;
+      this.pencilResizeState = null;
+      this.pencilRotationState = null;
       return;
     }
 
@@ -185,6 +219,30 @@ class SelectTool extends ToolStrategy {
         return null;
       }
 
+      case "pencil": {
+        const bounds = this.scene.getPencilBounds(shape);
+
+        if (!bounds) return null;
+
+        if (Math.abs(x - bounds.left) <= handleSize && Math.abs(y - bounds.top) <= handleSize) {
+          return "top-left";
+        }
+
+        if (Math.abs(x - bounds.right) <= handleSize && Math.abs(y - bounds.top) <= handleSize) {
+          return "top-right";
+        }
+
+        if (Math.abs(x - bounds.left) <= handleSize && Math.abs(y - bounds.bottom) <= handleSize) {
+          return "bottom-left";
+        }
+
+        if (Math.abs(x - bounds.right) <= handleSize && Math.abs(y - bounds.bottom) <= handleSize) {
+          return "bottom-right";
+        }
+
+        return null;
+      }
+
       case "line":
       case "arrow": {
         // Line/Arrow don't have width/height.
@@ -245,6 +303,14 @@ class SelectTool extends ToolStrategy {
 
       case "text":
         this.resizeText(shape, x, y);
+        break;
+
+      case "pencil":
+        if (handle === "rotate") {
+          this.rotatePencil(shape, x, y);
+        } else {
+          this.resizePencil(shape, x, y);
+        }
         break;
 
       case "line":
@@ -318,6 +384,104 @@ class SelectTool extends ToolStrategy {
     } else {
       text.y = state.anchorY;
     }
+  }
+
+  private startPencilResize(pencil: Pencil, handle: CornerHandle): void {
+    const bounds = this.scene.getPencilBounds(pencil);
+
+    if (!bounds) return;
+
+    const [anchorX, anchorY, handleX, handleY] =
+      handle === "top-left"
+        ? [bounds.right, bounds.bottom, bounds.left, bounds.top]
+        : handle === "top-right"
+          ? [bounds.left, bounds.bottom, bounds.right, bounds.top]
+          : handle === "bottom-left"
+            ? [bounds.right, bounds.top, bounds.left, bounds.bottom]
+            : [bounds.left, bounds.top, bounds.right, bounds.bottom];
+
+    this.pencilResizeState = {
+      handle,
+      anchorX,
+      anchorY,
+      startVectorX: handleX - anchorX,
+      startVectorY: handleY - anchorY,
+      startStrokeWidth: pencil.strokeWidth,
+      startPoints: pencil.points.map((point) => ({ ...point })),
+    };
+  }
+
+  private isPencilRotationHandle(x: number, y: number, pencil: Pencil): boolean {
+    const bounds = this.scene.getPencilBounds(pencil);
+
+    if (!bounds) return false;
+
+    const centerX = (bounds.left + bounds.right) / 2;
+    const rotationHandleY = bounds.top - PENCIL_ROTATION_HANDLE_OFFSET;
+
+    return Math.hypot(x - centerX, y - rotationHandleY) <= PENCIL_ROTATION_HANDLE_RADIUS;
+  }
+
+  private startPencilRotation(pencil: Pencil, x: number, y: number): void {
+    const bounds = this.scene.getPencilBounds(pencil);
+
+    if (!bounds) return;
+
+    const centerX = (bounds.left + bounds.right) / 2;
+    const centerY = (bounds.top + bounds.bottom) / 2;
+
+    this.pencilRotationState = {
+      centerX,
+      centerY,
+      startAngle: Math.atan2(y - centerY, x - centerX),
+      startPoints: pencil.points.map((point) => ({ ...point })),
+    };
+  }
+
+  private resizePencil(pencil: Pencil, x: number, y: number): void {
+    const state = this.pencilResizeState;
+
+    if (!state) return;
+
+    const startLengthSquared = state.startVectorX ** 2 + state.startVectorY ** 2;
+
+    if (startLengthSquared === 0) return;
+
+    const minimumScale = Math.max(
+      MIN_PENCIL_SCALE,
+      MIN_PENCIL_STROKE_WIDTH / state.startStrokeWidth,
+    );
+    const scale = Math.max(
+      minimumScale,
+      ((x - state.anchorX) * state.startVectorX + (y - state.anchorY) * state.startVectorY) /
+        startLengthSquared,
+    );
+
+    pencil.points = state.startPoints.map((point) => ({
+      x: state.anchorX + (point.x - state.anchorX) * scale,
+      y: state.anchorY + (point.y - state.anchorY) * scale,
+    }));
+    pencil.strokeWidth = state.startStrokeWidth * scale;
+  }
+
+  private rotatePencil(pencil: Pencil, x: number, y: number): void {
+    const state = this.pencilRotationState;
+
+    if (!state) return;
+
+    const angle = Math.atan2(y - state.centerY, x - state.centerX) - state.startAngle;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+
+    pencil.points = state.startPoints.map((point) => {
+      const relativeX = point.x - state.centerX;
+      const relativeY = point.y - state.centerY;
+
+      return {
+        x: state.centerX + relativeX * cos - relativeY * sin,
+        y: state.centerY + relativeX * sin + relativeY * cos,
+      };
+    });
   }
 }
 export default SelectTool;
