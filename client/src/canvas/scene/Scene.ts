@@ -31,6 +31,10 @@ class Scene {
     return this.shapes;
   }
 
+  replaceShapes(shapes: CanvasShape[]) {
+    this.shapes = shapes;
+  }
+
   addShape(shape: CanvasShape) {
     this.shapes.push(shape);
   }

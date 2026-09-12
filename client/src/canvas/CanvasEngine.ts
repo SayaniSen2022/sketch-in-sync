@@ -11,6 +11,9 @@ import ArrowTool from "./editor/tools/ArrowTool";
 import SelectTool from "./editor/tools/SelectTool";
 import PencilTool from "./editor/tools/PencilTool";
 import TextTool from "./editor/tools/TextTool";
+import { loadStoredScene, saveStoredScene } from "./scene/persistence";
+
+const AUTOSAVE_DELAY_MS = 350;
 
 class CanvasEngine {
   private canvas: HTMLCanvasElement;
@@ -23,6 +26,7 @@ class CanvasEngine {
 
   private tools!: Record<Tool, ToolStrategy>;
   private activeTool!: ToolStrategy;
+  private saveTimer: number | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -36,6 +40,7 @@ class CanvasEngine {
     }
 
     this.renderer = new CanvasRenderer(this.ctx);
+    this.scene.replaceShapes(loadStoredScene());
 
     this.tools = {
       rectangle: new RectangleTool(this.scene, this.editor),
@@ -58,7 +63,7 @@ class CanvasEngine {
     this.resizeCanvas();
     this.attachEventListeners();
 
-    this.render();
+    this.render(false);
   }
 
   public setTool(tool: Tool) {
@@ -71,6 +76,7 @@ class CanvasEngine {
 
     // Let the current tool finish in-progress work before switching away.
     this.activeTool.commitText();
+    this.saveScene();
 
     this.editor.setTool(tool);
     this.activeTool = nextTool;
@@ -82,6 +88,7 @@ class CanvasEngine {
    */
   public finishTextEditing() {
     this.activeTool.commitText();
+    this.saveScene();
   }
 
   /**
@@ -131,6 +138,7 @@ class CanvasEngine {
     this.execute(() => {
       this.activeTool.onMouseUp(event);
     });
+    this.saveScene();
   };
 
   private handleDoubleClick = (event: MouseEvent) => {
@@ -146,15 +154,20 @@ class CanvasEngine {
 
   private handleResize = () => {
     this.resizeCanvas();
-    this.render();
+    this.render(false);
   };
 
-  public render() {
+  public render(scheduleSave = true) {
     this.renderer.render(this.scene, this.editor);
+
+    if (scheduleSave && !this.editor.textEditing) {
+      this.scheduleSave();
+    }
   }
 
   destroy() {
     this.activeTool.commitText();
+    this.saveScene();
 
     window.removeEventListener("resize", this.handleResize);
 
@@ -165,6 +178,26 @@ class CanvasEngine {
     window.removeEventListener("mouseup", this.handleMouseUp);
 
     this.canvas.removeEventListener("dblclick", this.handleDoubleClick);
+  }
+
+  private scheduleSave() {
+    if (this.saveTimer !== null) {
+      window.clearTimeout(this.saveTimer);
+    }
+
+    this.saveTimer = window.setTimeout(() => {
+      this.saveTimer = null;
+      this.saveScene();
+    }, AUTOSAVE_DELAY_MS);
+  }
+
+  private saveScene() {
+    if (this.saveTimer !== null) {
+      window.clearTimeout(this.saveTimer);
+      this.saveTimer = null;
+    }
+
+    saveStoredScene(this.scene.getShapes());
   }
 }
 
