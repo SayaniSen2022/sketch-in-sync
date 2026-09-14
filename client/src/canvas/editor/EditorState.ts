@@ -1,8 +1,12 @@
 import type { Tool } from "./Tool";
 import type { CanvasShape } from "../scene";
-
-export const DEFAULT_TEXT_FONT_SIZE = 20;
-export const DEFAULT_TEXT_FONT_FAMILY = "Arial";
+import {
+  DEFAULT_CANVAS_BACKGROUND,
+  DEFAULT_STROKE_COLOR,
+  DEFAULT_STROKE_WIDTH,
+  DEFAULT_TEXT_FONT_FAMILY,
+  DEFAULT_TEXT_FONT_SIZE,
+} from "../stylePresets";
 
 interface TextEditingOptions {
   value?: string;
@@ -29,9 +33,12 @@ class EditorState {
   textY = 0;
 
   textValue = "";
-  textFontSize = DEFAULT_TEXT_FONT_SIZE;
-  textFontFamily = DEFAULT_TEXT_FONT_FAMILY;
+  textFontSize: number = DEFAULT_TEXT_FONT_SIZE;
+  textFontFamily: string = DEFAULT_TEXT_FONT_FAMILY;
   textCaretIndex = 0;
+  strokeColor: string = DEFAULT_STROKE_COLOR;
+  strokeWidth: number = DEFAULT_STROKE_WIDTH;
+  canvasBackgroundColor: string = DEFAULT_CANVAS_BACKGROUND;
 
   setTool(tool: Tool) {
     this.currentTool = tool;
@@ -49,6 +56,26 @@ class EditorState {
   }
   setSelectedShape(shape: CanvasShape | null) {
     this.selectedShape = shape;
+
+    if (shape) {
+      switch (shape.type) {
+        case "rectangle":
+        case "ellipse":
+        case "line":
+        case "arrow":
+        case "pencil":
+          this.strokeColor = shape.strokeColor;
+          this.strokeWidth = shape.strokeWidth;
+          break;
+
+        case "text":
+          this.textFontSize = shape.fontSize;
+          this.textFontFamily = shape.fontFamily;
+          break;
+      }
+    }
+
+    this.onChange?.();
   }
   startDragging(x: number, y: number) {
     this.isDragging = true;
@@ -87,6 +114,31 @@ class EditorState {
   }
   updateTextValue(value: string) {
     this.textValue = value;
+    this.onChange?.();
+  }
+
+  setStrokeColor(color: string) {
+    this.strokeColor = color;
+    this.onChange?.();
+  }
+
+  setStrokeWidth(width: number) {
+    this.strokeWidth = width;
+    this.onChange?.();
+  }
+
+  setTextFontSize(size: number) {
+    this.textFontSize = size;
+    this.onChange?.();
+  }
+
+  setTextFontFamily(fontFamily: string) {
+    this.textFontFamily = fontFamily;
+    this.onChange?.();
+  }
+
+  setCanvasBackgroundColor(color: string) {
+    this.canvasBackgroundColor = color;
     this.onChange?.();
   }
 

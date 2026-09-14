@@ -23,8 +23,8 @@ class LineTool extends ToolStrategy {
       x2: event.offsetX,
       y2: event.offsetY,
 
-      strokeColor: "#fff",
-      strokeWidth: 2,
+      strokeColor: this.editor.strokeColor,
+      strokeWidth: this.editor.strokeWidth,
     };
 
     this.scene.addShape(line);

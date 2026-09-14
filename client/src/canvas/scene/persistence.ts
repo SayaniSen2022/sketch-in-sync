@@ -1,36 +1,56 @@
 import type { CanvasShape } from "./types";
+import { BACKGROUND_COLORS, DEFAULT_CANVAS_BACKGROUND } from "../stylePresets";
 
 const STORAGE_KEY = "sketch-in-sync:scene:v1";
-const STORAGE_VERSION = 1;
+const STORAGE_VERSION = 2;
 
-interface StoredScene {
+interface StoredDocument {
+  version: number;
+  shapes: CanvasShape[];
+  backgroundColor: string;
+}
+
+interface StoredSceneV1 {
   version: number;
   shapes: CanvasShape[];
 }
 
 let hasReportedStorageError = false;
 
-export function loadStoredScene(): CanvasShape[] {
+export function loadStoredDocument(): { shapes: CanvasShape[]; backgroundColor: string } {
   try {
     const value = window.localStorage.getItem(STORAGE_KEY);
 
-    if (!value) return [];
+    if (!value) return emptyDocument();
 
     const storedScene: unknown = JSON.parse(value);
 
-    if (!isStoredScene(storedScene)) return [];
+    if (isStoredDocument(storedScene)) {
+      return {
+        shapes: storedScene.shapes,
+        backgroundColor: storedScene.backgroundColor,
+      };
+    }
 
-    return storedScene.shapes;
+    if (isStoredSceneV1(storedScene)) {
+      return {
+        shapes: storedScene.shapes,
+        backgroundColor: DEFAULT_CANVAS_BACKGROUND,
+      };
+    }
+
+    return emptyDocument();
   } catch {
     reportStorageError();
-    return [];
+    return emptyDocument();
   }
 }
 
-export function saveStoredScene(shapes: CanvasShape[]): void {
-  const storedScene: StoredScene = {
+export function saveStoredDocument(shapes: CanvasShape[], backgroundColor: string): void {
+  const storedScene: StoredDocument = {
     version: STORAGE_VERSION,
     shapes,
+    backgroundColor,
   };
 
   try {
@@ -40,10 +60,32 @@ export function saveStoredScene(shapes: CanvasShape[]): void {
   }
 }
 
-function isStoredScene(value: unknown): value is StoredScene {
+export function clearStoredDocument(): void {
+  try {
+    window.localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    reportStorageError();
+  }
+}
+
+function emptyDocument(): { shapes: CanvasShape[]; backgroundColor: string } {
+  return { shapes: [], backgroundColor: DEFAULT_CANVAS_BACKGROUND };
+}
+
+function isStoredDocument(value: unknown): value is StoredDocument {
   return (
     isRecord(value) &&
     value.version === STORAGE_VERSION &&
+    Array.isArray(value.shapes) &&
+    isBackgroundColor(value.backgroundColor) &&
+    value.shapes.every(isCanvasShape)
+  );
+}
+
+function isStoredSceneV1(value: unknown): value is StoredSceneV1 {
+  return (
+    isRecord(value) &&
+    value.version === 1 &&
     Array.isArray(value.shapes) &&
     value.shapes.every(isCanvasShape)
   );
@@ -103,6 +145,13 @@ function hasStrings(value: Record<string, unknown>, ...keys: string[]): boolean 
 
 function hasNumbers(value: Record<string, unknown>, ...keys: string[]): boolean {
   return keys.every((key) => typeof value[key] === "number" && Number.isFinite(value[key]));
+}
+
+function isBackgroundColor(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    BACKGROUND_COLORS.includes(value as (typeof BACKGROUND_COLORS)[number])
+  );
 }
 
 function reportStorageError(): void {

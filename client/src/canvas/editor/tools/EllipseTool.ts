@@ -23,9 +23,9 @@ class EllipseTool extends ToolStrategy {
       width: 0,
       height: 0,
 
-      strokeColor: "#fff",
+      strokeColor: this.editor.strokeColor,
       fillColor: "transparent",
-      strokeWidth: 2,
+      strokeWidth: this.editor.strokeWidth,
     };
 
     this.scene.addShape(ellipse);

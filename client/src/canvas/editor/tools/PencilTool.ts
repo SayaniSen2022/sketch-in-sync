@@ -24,8 +24,8 @@ class PencilTool extends ToolStrategy {
           y: event.offsetY,
         },
       ],
-      strokeColor: "#fff",
-      strokeWidth: 2,
+      strokeColor: this.editor.strokeColor,
+      strokeWidth: this.editor.strokeWidth,
     };
 
     this.scene.addShape(pencil);

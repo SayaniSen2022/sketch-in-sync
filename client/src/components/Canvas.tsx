@@ -2,7 +2,9 @@ import { useState, useRef, useEffect } from "react";
 import type { Tool } from "@/canvas/editor/Tool";
 import CanvasEngine from "../canvas/CanvasEngine";
 import Toolbar from "./Toolbar";
+import StyleSidebar from "./StyleSidebar";
 import EditorState from "@/canvas/editor/EditorState";
+import { DEFAULT_CANVAS_BACKGROUND } from "@/canvas/stylePresets";
 
 const Canvas = () => {
   const [editor, setEditor] = useState<EditorState | null>(null);
@@ -84,9 +86,26 @@ const Canvas = () => {
     }
   };
 
+  const engine = engineRef.current;
+
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-neutral-900">
-      <Toolbar currentTool={tool} onToolChange={handleToolChange} />
+    <div
+      className="relative h-screen w-screen overflow-hidden"
+      style={{ backgroundColor: editor?.canvasBackgroundColor ?? DEFAULT_CANVAS_BACKGROUND }}
+    >
+      <Toolbar
+        currentTool={tool}
+        onToolChange={handleToolChange}
+        onClearCanvas={() => engine?.clearCanvas()}
+      />
+      <StyleSidebar
+        editor={editor}
+        onStrokeColorChange={(color) => engine?.setStrokeColor(color)}
+        onStrokeWidthChange={(width) => engine?.setStrokeWidth(width)}
+        onTextFontSizeChange={(size) => engine?.setTextFontSize(size)}
+        onTextFontFamilyChange={(fontFamily) => engine?.setTextFontFamily(fontFamily)}
+        onBackgroundColorChange={(color) => engine?.setCanvasBackgroundColor(color)}
+      />
 
       <canvas
         className={`absolute inset-0w-full h-full ${

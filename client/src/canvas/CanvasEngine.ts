@@ -4,6 +4,7 @@ import CanvasRenderer from "./CanvasRenderer";
 import EditorState from "./editor/EditorState";
 import type { ToolStrategy } from "./editor/tools/ToolStrategy";
 import type { Tool } from "./editor/Tool";
+import type { CanvasShape } from "./scene";
 
 import EllipseTool from "./editor/tools/EllipseTool";
 import LineTool from "./editor/tools/LineTool";
@@ -11,7 +12,7 @@ import ArrowTool from "./editor/tools/ArrowTool";
 import SelectTool from "./editor/tools/SelectTool";
 import PencilTool from "./editor/tools/PencilTool";
 import TextTool from "./editor/tools/TextTool";
-import { loadStoredScene, saveStoredScene } from "./scene/persistence";
+import { clearStoredDocument, loadStoredDocument, saveStoredDocument } from "./scene/persistence";
 
 const AUTOSAVE_DELAY_MS = 350;
 
@@ -40,7 +41,9 @@ class CanvasEngine {
     }
 
     this.renderer = new CanvasRenderer(this.ctx);
-    this.scene.replaceShapes(loadStoredScene());
+    const storedDocument = loadStoredDocument();
+    this.scene.replaceShapes(storedDocument.shapes);
+    this.editor.setCanvasBackgroundColor(storedDocument.backgroundColor);
 
     this.tools = {
       rectangle: new RectangleTool(this.scene, this.editor),
@@ -89,6 +92,89 @@ class CanvasEngine {
   public finishTextEditing() {
     this.activeTool.commitText();
     this.saveScene();
+  }
+
+  public setStrokeColor(color: string) {
+    const shape = this.getActiveShape();
+
+    if (shape) {
+      switch (shape.type) {
+        case "rectangle":
+        case "ellipse":
+        case "line":
+        case "arrow":
+        case "pencil":
+          shape.strokeColor = color;
+          break;
+      }
+    }
+
+    this.editor.setStrokeColor(color);
+    this.saveScene();
+  }
+
+  public setStrokeWidth(width: number) {
+    const shape = this.getActiveShape();
+
+    if (shape) {
+      switch (shape.type) {
+        case "rectangle":
+        case "ellipse":
+        case "line":
+        case "arrow":
+        case "pencil":
+          shape.strokeWidth = width;
+          break;
+      }
+    }
+
+    this.editor.setStrokeWidth(width);
+    this.saveScene();
+  }
+
+  public setTextFontSize(size: number) {
+    const shape = this.getActiveShape();
+
+    if (shape?.type === "text") {
+      shape.fontSize = size;
+    }
+
+    this.editor.setTextFontSize(size);
+
+    if (!this.editor.textEditing) {
+      this.saveScene();
+    }
+  }
+
+  public setTextFontFamily(fontFamily: string) {
+    const shape = this.getActiveShape();
+
+    if (shape?.type === "text") {
+      shape.fontFamily = fontFamily;
+    }
+
+    this.editor.setTextFontFamily(fontFamily);
+
+    if (!this.editor.textEditing) {
+      this.saveScene();
+    }
+  }
+
+  public setCanvasBackgroundColor(color: string) {
+    this.editor.setCanvasBackgroundColor(color);
+    this.saveScene();
+  }
+
+  public clearCanvas() {
+    this.activeTool.commitText();
+    this.scene.clear();
+    this.editor.clearSelection();
+    this.editor.finishDrawing();
+    this.editor.stopDragging();
+    this.editor.stopResizing();
+    this.render(false);
+    this.cancelScheduledSave();
+    clearStoredDocument();
   }
 
   /**
@@ -192,12 +278,20 @@ class CanvasEngine {
   }
 
   private saveScene() {
-    if (this.saveTimer !== null) {
-      window.clearTimeout(this.saveTimer);
-      this.saveTimer = null;
-    }
+    this.cancelScheduledSave();
 
-    saveStoredScene(this.scene.getShapes());
+    saveStoredDocument(this.scene.getShapes(), this.editor.canvasBackgroundColor);
+  }
+
+  private getActiveShape(): CanvasShape | null {
+    return this.editor.currentShape ?? this.editor.selectedShape;
+  }
+
+  private cancelScheduledSave() {
+    if (this.saveTimer === null) return;
+
+    window.clearTimeout(this.saveTimer);
+    this.saveTimer = null;
   }
 }
 
