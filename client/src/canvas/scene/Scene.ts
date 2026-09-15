@@ -61,6 +61,45 @@ class Scene {
     return this.shapes;
   }
 
+  getShapeBounds(
+    shape: CanvasShape,
+  ): { left: number; top: number; right: number; bottom: number } | null {
+    switch (shape.type) {
+      case "rectangle":
+      case "ellipse":
+        return {
+          left: Math.min(shape.x, shape.x + shape.width),
+          top: Math.min(shape.y, shape.y + shape.height),
+          right: Math.max(shape.x, shape.x + shape.width),
+          bottom: Math.max(shape.y, shape.y + shape.height),
+        };
+      case "line":
+      case "arrow":
+        return {
+          left: Math.min(shape.x1, shape.x2),
+          top: Math.min(shape.y1, shape.y2),
+          right: Math.max(shape.x1, shape.x2),
+          bottom: Math.max(shape.y1, shape.y2),
+        };
+      case "text":
+        return this.getTextBounds(shape);
+      case "pencil":
+        return this.getPencilBounds(shape);
+    }
+  }
+  getShapesInBounds(left: number, top: number, right: number, bottom: number): CanvasShape[] {
+    return this.shapes.filter((shape) => {
+      const bounds = this.getShapeBounds(shape);
+      return (
+        !!bounds &&
+        bounds.left >= left &&
+        bounds.top >= top &&
+        bounds.right <= right &&
+        bounds.bottom <= bottom
+      );
+    });
+  }
+
   replaceShapes(shapes: CanvasShape[]) {
     this.shapes = shapes;
   }
@@ -272,6 +311,10 @@ class Scene {
   }
   removeShape(shape: CanvasShape) {
     this.shapes = this.shapes.filter((existing) => existing !== shape);
+  }
+  removeShapes(shapes: CanvasShape[]) {
+    const selected = new Set(shapes);
+    this.shapes = this.shapes.filter((shape) => !selected.has(shape));
   }
   clear() {
     this.shapes = [];

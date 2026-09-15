@@ -41,10 +41,12 @@ class CanvasRenderer {
           this.drawText(shape);
           break;
       }
-      if (shape === editor.selectedShape) {
+      if (editor.selectedShapes.length === 1 && shape === editor.selectedShape) {
         this.drawSelection(shape);
       }
     }
+    if (editor.selectedShapes.length > 1) this.drawGroupSelection(editor.selectedShapes);
+    if (editor.isMarqueeSelecting) this.drawMarquee(editor);
   }
 
   private clearCanvas(): void {
@@ -179,6 +181,32 @@ class CanvasRenderer {
     this.drawHandle(left, top + height);
     this.drawHandle(left + width, top + height);
 
+    this.ctx.restore();
+  }
+  private drawGroupSelection(shapes: CanvasShape[]): void {
+    if (!this.scene) return;
+    const bounds = shapes
+      .map((shape) => this.scene?.getShapeBounds(shape))
+      .filter((bound): bound is NonNullable<typeof bound> => bound !== null && bound !== undefined);
+    if (!bounds.length) return;
+    const left = Math.min(...bounds.map((bound) => bound.left));
+    const top = Math.min(...bounds.map((bound) => bound.top));
+    const right = Math.max(...bounds.map((bound) => bound.right));
+    const bottom = Math.max(...bounds.map((bound) => bound.bottom));
+    this.drawSelectionBox(left, top, right - left, bottom - top);
+  }
+  private drawMarquee(editor: EditorState): void {
+    const left = Math.min(editor.marqueeStartX, editor.marqueeEndX);
+    const top = Math.min(editor.marqueeStartY, editor.marqueeEndY);
+    this.ctx.save();
+    this.ctx.strokeStyle = "#4EA8FF";
+    this.ctx.setLineDash([6, 4]);
+    this.ctx.strokeRect(
+      left,
+      top,
+      Math.abs(editor.marqueeEndX - editor.marqueeStartX),
+      Math.abs(editor.marqueeEndY - editor.marqueeStartY),
+    );
     this.ctx.restore();
   }
   private drawHandle(x: number, y: number): void {

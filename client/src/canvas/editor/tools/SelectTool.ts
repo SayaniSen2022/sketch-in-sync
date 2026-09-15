@@ -30,6 +30,13 @@ interface PencilRotationState {
   startAngle: number;
   startPoints: { x: number; y: number }[];
 }
+interface GroupResizeState {
+  anchorX: number;
+  anchorY: number;
+  vectorX: number;
+  vectorY: number;
+  shapes: CanvasShape[];
+}
 
 const MIN_TEXT_FONT_SIZE = 4;
 const MIN_PENCIL_STROKE_WIDTH = 0.5;
@@ -44,6 +51,7 @@ class SelectTool extends ToolStrategy {
   private pencilResizeState: PencilResizeState | null = null;
   private pencilRotationState: PencilRotationState | null = null;
   private editingText: Text | null = null;
+  private groupResizeState: GroupResizeState | null = null;
   constructor(scene: Scene, editor: EditorState) {
     super();
     this.scene = scene;
@@ -54,7 +62,17 @@ class SelectTool extends ToolStrategy {
     const x = event.offsetX;
     const y = event.offsetY;
 
-    const selectedShape = this.editor.selectedShape;
+    const selectedShape =
+      this.editor.selectedShapes.length === 1 ? this.editor.selectedShape : null;
+
+    if (this.editor.selectedShapes.length > 1) {
+      const handle = this.getGroupResizeHandle(x, y);
+      if (handle) {
+        this.startGroupResize(handle);
+        this.editor.startResizing(handle);
+        return;
+      }
+    }
 
     // Check resize handles first
     if (selectedShape) {
@@ -78,19 +96,33 @@ class SelectTool extends ToolStrategy {
       }
     }
 
-    // Otherwise select a shape
     const shape = this.scene.findShapeAt(x, y);
-
-    this.editor.setSelectedShape(shape);
-
     if (shape) {
+      if (event.shiftKey) {
+        this.editor.toggleSelectedShape(shape);
+        return;
+      }
+      if (!this.editor.selectedShapes.includes(shape)) this.editor.setSelectedShape(shape);
       this.editor.startDragging(x, y);
+    } else {
+      if (!event.shiftKey) this.editor.clearSelection();
+      this.editor.startMarqueeSelection(x, y);
     }
   }
 
   onMouseMove(event: MouseEvent): void {
     const x = event.offsetX;
     const y = event.offsetY;
+
+    if (this.editor.isMarqueeSelecting) {
+      this.editor.updateMarqueeSelection(x, y);
+      return;
+    }
+
+    if (this.editor.isResizing && this.groupResizeState) {
+      this.resizeGroup(x, y);
+      return;
+    }
 
     const shape = this.editor.selectedShape;
 
@@ -106,18 +138,28 @@ class SelectTool extends ToolStrategy {
     const dx = x - this.editor.dragOffsetX;
     const dy = y - this.editor.dragOffsetY;
 
-    this.scene.moveShape(shape, dx, dy);
+    this.editor.selectedShapes.forEach((selected) => this.scene.moveShape(selected, dx, dy));
 
     this.editor.dragOffsetX = x;
     this.editor.dragOffsetY = y;
   }
 
   onMouseUp(): void {
+    if (this.editor.isMarqueeSelecting) {
+      const left = Math.min(this.editor.marqueeStartX, this.editor.marqueeEndX);
+      const top = Math.min(this.editor.marqueeStartY, this.editor.marqueeEndY);
+      const right = Math.max(this.editor.marqueeStartX, this.editor.marqueeEndX);
+      const bottom = Math.max(this.editor.marqueeStartY, this.editor.marqueeEndY);
+      this.editor.setSelectedShapes(this.scene.getShapesInBounds(left, top, right, bottom));
+      this.editor.stopMarqueeSelection();
+      return;
+    }
     if (this.editor.isResizing) {
       this.editor.stopResizing();
       this.textResizeState = null;
       this.pencilResizeState = null;
       this.pencilRotationState = null;
+      this.groupResizeState = null;
       return;
     }
 
@@ -481,6 +523,104 @@ class SelectTool extends ToolStrategy {
         x: state.centerX + relativeX * cos - relativeY * sin,
         y: state.centerY + relativeX * sin + relativeY * cos,
       };
+    });
+  }
+
+  private getGroupResizeHandle(x: number, y: number): CornerHandle | null {
+    const bounds = this.getGroupBounds();
+    if (!bounds) return null;
+    const size = 8;
+    if (Math.abs(x - bounds.left) <= size && Math.abs(y - bounds.top) <= size) return "top-left";
+    if (Math.abs(x - bounds.right) <= size && Math.abs(y - bounds.top) <= size) return "top-right";
+    if (Math.abs(x - bounds.left) <= size && Math.abs(y - bounds.bottom) <= size)
+      return "bottom-left";
+    if (Math.abs(x - bounds.right) <= size && Math.abs(y - bounds.bottom) <= size)
+      return "bottom-right";
+    return null;
+  }
+  private getGroupBounds() {
+    const bounds = this.editor.selectedShapes
+      .map((shape) => this.scene.getShapeBounds(shape))
+      .filter((bound): bound is NonNullable<typeof bound> => bound !== null);
+    if (!bounds.length) return null;
+    return {
+      left: Math.min(...bounds.map((b) => b.left)),
+      top: Math.min(...bounds.map((b) => b.top)),
+      right: Math.max(...bounds.map((b) => b.right)),
+      bottom: Math.max(...bounds.map((b) => b.bottom)),
+    };
+  }
+  private startGroupResize(handle: CornerHandle) {
+    const bounds = this.getGroupBounds();
+    if (!bounds) return;
+    const [anchorX, anchorY, handleX, handleY] =
+      handle === "top-left"
+        ? [bounds.right, bounds.bottom, bounds.left, bounds.top]
+        : handle === "top-right"
+          ? [bounds.left, bounds.bottom, bounds.right, bounds.top]
+          : handle === "bottom-left"
+            ? [bounds.right, bounds.top, bounds.left, bounds.bottom]
+            : [bounds.left, bounds.top, bounds.right, bounds.bottom];
+    this.groupResizeState = {
+      anchorX,
+      anchorY,
+      vectorX: handleX - anchorX,
+      vectorY: handleY - anchorY,
+      shapes: JSON.parse(JSON.stringify(this.editor.selectedShapes)) as CanvasShape[],
+    };
+  }
+  private resizeGroup(x: number, y: number) {
+    const state = this.groupResizeState;
+    if (!state) return;
+    const length = state.vectorX ** 2 + state.vectorY ** 2;
+    if (!length) return;
+    const scale = Math.max(
+      0.05,
+      ((x - state.anchorX) * state.vectorX + (y - state.anchorY) * state.vectorY) / length,
+    );
+    this.editor.selectedShapes.forEach((shape, index) => {
+      const source = state.shapes[index];
+      const point = (px: number, py: number) => ({
+        x: state.anchorX + (px - state.anchorX) * scale,
+        y: state.anchorY + (py - state.anchorY) * scale,
+      });
+      switch (shape.type) {
+        case "rectangle":
+        case "ellipse": {
+          if (source.type !== shape.type) return;
+          const p = point(source.x, source.y);
+          shape.x = p.x;
+          shape.y = p.y;
+          shape.width = source.width * scale;
+          shape.height = source.height * scale;
+          break;
+        }
+        case "line":
+        case "arrow": {
+          if (source.type !== shape.type) return;
+          const a = point(source.x1, source.y1),
+            b = point(source.x2, source.y2);
+          shape.x1 = a.x;
+          shape.y1 = a.y;
+          shape.x2 = b.x;
+          shape.y2 = b.y;
+          break;
+        }
+        case "text": {
+          if (source.type !== "text") return;
+          const p = point(source.x, source.y);
+          shape.x = p.x;
+          shape.y = p.y;
+          shape.fontSize = source.fontSize * scale;
+          break;
+        }
+        case "pencil": {
+          if (source.type !== "pencil") return;
+          shape.points = source.points.map((p) => point(p.x, p.y));
+          shape.strokeWidth = source.strokeWidth * scale;
+          break;
+        }
+      }
     });
   }
 }

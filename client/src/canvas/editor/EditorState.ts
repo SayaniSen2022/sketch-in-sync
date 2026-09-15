@@ -18,7 +18,12 @@ interface TextEditingOptions {
 class EditorState {
   currentTool: Tool = "rectangle";
   isDrawing = false;
-  selectedShape: CanvasShape | null = null;
+  selectedShapes: CanvasShape[] = [];
+  isMarqueeSelecting = false;
+  marqueeStartX = 0;
+  marqueeStartY = 0;
+  marqueeEndX = 0;
+  marqueeEndY = 0;
   currentShape: CanvasShape | null = null;
   isDragging: boolean = false;
   dragStartX: number = 0;
@@ -44,7 +49,7 @@ class EditorState {
     this.currentTool = tool;
   }
   clearSelection() {
-    this.selectedShape = null;
+    this.setSelectedShapes([]);
   }
   startDrawing(shape: CanvasShape) {
     this.currentShape = shape;
@@ -55,7 +60,14 @@ class EditorState {
     this.isDrawing = false;
   }
   setSelectedShape(shape: CanvasShape | null) {
-    this.selectedShape = shape;
+    this.setSelectedShapes(shape ? [shape] : []);
+  }
+  get selectedShape(): CanvasShape | null {
+    return this.selectedShapes[0] ?? null;
+  }
+  setSelectedShapes(shapes: CanvasShape[]) {
+    this.selectedShapes = shapes;
+    const shape = this.selectedShape;
 
     if (shape) {
       switch (shape.type) {
@@ -76,6 +88,27 @@ class EditorState {
     }
 
     this.onChange?.();
+  }
+  toggleSelectedShape(shape: CanvasShape) {
+    this.setSelectedShapes(
+      this.selectedShapes.includes(shape)
+        ? this.selectedShapes.filter((selected) => selected !== shape)
+        : [...this.selectedShapes, shape],
+    );
+  }
+  startMarqueeSelection(x: number, y: number) {
+    this.isMarqueeSelecting = true;
+    this.marqueeStartX = x;
+    this.marqueeStartY = y;
+    this.marqueeEndX = x;
+    this.marqueeEndY = y;
+  }
+  updateMarqueeSelection(x: number, y: number) {
+    this.marqueeEndX = x;
+    this.marqueeEndY = y;
+  }
+  stopMarqueeSelection() {
+    this.isMarqueeSelecting = false;
   }
   startDragging(x: number, y: number) {
     this.isDragging = true;

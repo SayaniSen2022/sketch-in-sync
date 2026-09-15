@@ -95,9 +95,7 @@ class CanvasEngine {
   }
 
   public setStrokeColor(color: string) {
-    const shape = this.getActiveShape();
-
-    if (shape) {
+    this.getActiveShapes().forEach((shape) => {
       switch (shape.type) {
         case "rectangle":
         case "ellipse":
@@ -107,16 +105,14 @@ class CanvasEngine {
           shape.strokeColor = color;
           break;
       }
-    }
+    });
 
     this.editor.setStrokeColor(color);
     this.saveScene();
   }
 
   public setStrokeWidth(width: number) {
-    const shape = this.getActiveShape();
-
-    if (shape) {
+    this.getActiveShapes().forEach((shape) => {
       switch (shape.type) {
         case "rectangle":
         case "ellipse":
@@ -126,18 +122,16 @@ class CanvasEngine {
           shape.strokeWidth = width;
           break;
       }
-    }
+    });
 
     this.editor.setStrokeWidth(width);
     this.saveScene();
   }
 
   public setTextFontSize(size: number) {
-    const shape = this.getActiveShape();
-
-    if (shape?.type === "text") {
-      shape.fontSize = size;
-    }
+    this.getActiveShapes().forEach((shape) => {
+      if (shape.type === "text") shape.fontSize = size;
+    });
 
     this.editor.setTextFontSize(size);
 
@@ -147,11 +141,9 @@ class CanvasEngine {
   }
 
   public setTextFontFamily(fontFamily: string) {
-    const shape = this.getActiveShape();
-
-    if (shape?.type === "text") {
-      shape.fontFamily = fontFamily;
-    }
+    this.getActiveShapes().forEach((shape) => {
+      if (shape.type === "text") shape.fontFamily = fontFamily;
+    });
 
     this.editor.setTextFontFamily(fontFamily);
 
@@ -206,6 +198,7 @@ class CanvasEngine {
     window.addEventListener("mouseup", this.handleMouseUp);
 
     this.canvas.addEventListener("dblclick", this.handleDoubleClick);
+    window.addEventListener("keydown", this.handleKeyDown);
   }
 
   private handleMouseDown = (event: MouseEvent) => {
@@ -231,6 +224,16 @@ class CanvasEngine {
     this.execute(() => {
       this.activeTool.onDoubleClick(event);
     });
+  };
+
+  private handleKeyDown = (event: KeyboardEvent) => {
+    if (event.key !== "Delete" || event.target instanceof HTMLTextAreaElement) return;
+    if (this.editor.selectedShapes.length === 0) return;
+    event.preventDefault();
+    this.scene.removeShapes(this.editor.selectedShapes);
+    this.editor.clearSelection();
+    this.render(false);
+    this.saveScene();
   };
 
   private execute(action: () => void) {
@@ -264,6 +267,7 @@ class CanvasEngine {
     window.removeEventListener("mouseup", this.handleMouseUp);
 
     this.canvas.removeEventListener("dblclick", this.handleDoubleClick);
+    window.removeEventListener("keydown", this.handleKeyDown);
   }
 
   private scheduleSave() {
@@ -283,8 +287,8 @@ class CanvasEngine {
     saveStoredDocument(this.scene.getShapes(), this.editor.canvasBackgroundColor);
   }
 
-  private getActiveShape(): CanvasShape | null {
-    return this.editor.currentShape ?? this.editor.selectedShape;
+  private getActiveShapes(): CanvasShape[] {
+    return this.editor.currentShape ? [this.editor.currentShape] : this.editor.selectedShapes;
   }
 
   private cancelScheduledSave() {
