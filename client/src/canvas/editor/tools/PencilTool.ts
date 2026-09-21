@@ -1,6 +1,6 @@
 import Scene from "@/canvas/scene/Scene";
 import EditorState from "../EditorState";
-import { ToolStrategy } from "./ToolStrategy";
+import { ToolStrategy, type CanvasPointerEvent } from "./ToolStrategy";
 import type { Pencil } from "@/canvas/scene";
 
 class PencilTool extends ToolStrategy {
@@ -13,15 +13,15 @@ class PencilTool extends ToolStrategy {
     this.editor = editor;
   }
 
-  onMouseDown(event: MouseEvent): void {
+  onMouseDown(event: CanvasPointerEvent): void {
     // start a new pencil shape
     const pencil: Pencil = {
       id: crypto.randomUUID(),
       type: "pencil",
       points: [
         {
-          x: event.offsetX,
-          y: event.offsetY,
+          x: event.x,
+          y: event.y,
         },
       ],
       strokeColor: this.editor.strokeColor,
@@ -33,15 +33,15 @@ class PencilTool extends ToolStrategy {
     this.editor.startDrawing(pencil);
   }
 
-  onMouseMove(event: MouseEvent): void {
+  onMouseMove(event: CanvasPointerEvent): void {
     // add points
     const pencil = this.editor.currentShape;
 
     if (!pencil || pencil.type !== "pencil") return;
 
     pencil.points.push({
-      x: event.offsetX,
-      y: event.offsetY,
+      x: event.x,
+      y: event.y,
     });
   }
 

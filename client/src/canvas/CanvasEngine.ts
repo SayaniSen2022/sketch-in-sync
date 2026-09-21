@@ -3,6 +3,7 @@ import Scene from "./scene/Scene";
 import CanvasRenderer from "./CanvasRenderer";
 import EditorState from "./editor/EditorState";
 import type { ToolStrategy } from "./editor/tools/ToolStrategy";
+import type { CanvasPointerEvent } from "./editor/tools/ToolStrategy";
 import type { Tool } from "./editor/Tool";
 import type { CanvasShape } from "./scene";
 
@@ -12,7 +13,8 @@ import ArrowTool from "./editor/tools/ArrowTool";
 import SelectTool from "./editor/tools/SelectTool";
 import PencilTool from "./editor/tools/PencilTool";
 import TextTool from "./editor/tools/TextTool";
-import { clearStoredDocument, loadStoredDocument, saveStoredDocument } from "./scene/persistence";
+import { loadStoredDocument, saveStoredDocument } from "./scene/persistence";
+import { MAX_ZOOM, MIN_ZOOM } from "./viewport";
 
 const AUTOSAVE_DELAY_MS = 350;
 
@@ -28,6 +30,10 @@ class CanvasEngine {
   private tools!: Record<Tool, ToolStrategy>;
   private activeTool!: ToolStrategy;
   private saveTimer: number | null = null;
+  private isSpacePressed = false;
+  private isPanning = false;
+  private panStartX = 0;
+  private panStartY = 0;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -44,6 +50,7 @@ class CanvasEngine {
     const storedDocument = loadStoredDocument();
     this.scene.replaceShapes(storedDocument.shapes);
     this.editor.setCanvasBackgroundColor(storedDocument.backgroundColor);
+    this.editor.setViewport(storedDocument.viewport);
 
     this.tools = {
       rectangle: new RectangleTool(this.scene, this.editor),
@@ -165,8 +172,15 @@ class CanvasEngine {
     this.editor.stopDragging();
     this.editor.stopResizing();
     this.render(false);
-    this.cancelScheduledSave();
-    clearStoredDocument();
+    this.saveScene();
+  }
+
+  public zoomBy(delta: number) {
+    this.zoomAt(this.canvas.width / 2, this.canvas.height / 2, this.editor.viewport.zoom + delta);
+  }
+
+  public resetZoom() {
+    this.zoomAt(this.canvas.width / 2, this.canvas.height / 2, 1);
   }
 
   /**
@@ -198,35 +212,73 @@ class CanvasEngine {
     window.addEventListener("mouseup", this.handleMouseUp);
 
     this.canvas.addEventListener("dblclick", this.handleDoubleClick);
+    this.canvas.addEventListener("wheel", this.handleWheel, { passive: false });
     window.addEventListener("keydown", this.handleKeyDown);
+    window.addEventListener("keyup", this.handleKeyUp);
   }
 
   private handleMouseDown = (event: MouseEvent) => {
+    if (event.button === 1 || (event.button === 0 && this.isSpacePressed)) {
+      event.preventDefault();
+      this.isPanning = true;
+      const point = this.getCanvasPoint(event);
+      this.panStartX = point.x;
+      this.panStartY = point.y;
+      return;
+    }
+
+    if (event.button !== 0) return;
     this.execute(() => {
-      this.activeTool.onMouseDown(event);
+      this.activeTool.onMouseDown(this.getWorldPointerEvent(event));
     });
   };
 
   private handleMouseMove = (event: MouseEvent) => {
+    if (this.isPanning) {
+      const point = this.getCanvasPoint(event);
+      this.editor.panBy(point.x - this.panStartX, point.y - this.panStartY);
+      this.panStartX = point.x;
+      this.panStartY = point.y;
+      return;
+    }
     this.execute(() => {
-      this.activeTool.onMouseMove(event);
+      this.activeTool.onMouseMove(this.getWorldPointerEvent(event));
     });
   };
 
   private handleMouseUp = (event: MouseEvent) => {
+    if (this.isPanning) {
+      this.isPanning = false;
+      this.saveScene();
+      return;
+    }
     this.execute(() => {
-      this.activeTool.onMouseUp(event);
+      this.activeTool.onMouseUp(this.getWorldPointerEvent(event));
     });
     this.saveScene();
   };
 
   private handleDoubleClick = (event: MouseEvent) => {
     this.execute(() => {
-      this.activeTool.onDoubleClick(event);
+      this.activeTool.onDoubleClick(this.getWorldPointerEvent(event));
     });
   };
 
+  private handleWheel = (event: WheelEvent) => {
+    if (!event.ctrlKey && !event.metaKey) return;
+
+    event.preventDefault();
+    const point = this.getCanvasPoint(event);
+    const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
+    this.zoomAt(point.x, point.y, this.editor.viewport.zoom * factor);
+  };
+
   private handleKeyDown = (event: KeyboardEvent) => {
+    if (event.code === "Space" && !(event.target instanceof HTMLTextAreaElement)) {
+      this.isSpacePressed = true;
+      event.preventDefault();
+      return;
+    }
     if (event.key !== "Delete" || event.target instanceof HTMLTextAreaElement) return;
     if (this.editor.selectedShapes.length === 0) return;
     event.preventDefault();
@@ -234,6 +286,10 @@ class CanvasEngine {
     this.editor.clearSelection();
     this.render(false);
     this.saveScene();
+  };
+
+  private handleKeyUp = (event: KeyboardEvent) => {
+    if (event.code === "Space") this.isSpacePressed = false;
   };
 
   private execute(action: () => void) {
@@ -247,7 +303,7 @@ class CanvasEngine {
   };
 
   public render(scheduleSave = true) {
-    this.renderer.render(this.scene, this.editor);
+    this.renderer.render(this.scene, this.editor, this.editor.viewport);
 
     if (scheduleSave && !this.editor.textEditing) {
       this.scheduleSave();
@@ -267,7 +323,9 @@ class CanvasEngine {
     window.removeEventListener("mouseup", this.handleMouseUp);
 
     this.canvas.removeEventListener("dblclick", this.handleDoubleClick);
+    this.canvas.removeEventListener("wheel", this.handleWheel);
     window.removeEventListener("keydown", this.handleKeyDown);
+    window.removeEventListener("keyup", this.handleKeyUp);
   }
 
   private scheduleSave() {
@@ -284,7 +342,11 @@ class CanvasEngine {
   private saveScene() {
     this.cancelScheduledSave();
 
-    saveStoredDocument(this.scene.getShapes(), this.editor.canvasBackgroundColor);
+    saveStoredDocument(
+      this.scene.getShapes(),
+      this.editor.canvasBackgroundColor,
+      this.editor.viewport,
+    );
   }
 
   private getActiveShapes(): CanvasShape[] {
@@ -296,6 +358,36 @@ class CanvasEngine {
 
     window.clearTimeout(this.saveTimer);
     this.saveTimer = null;
+  }
+
+  private getCanvasPoint(event: MouseEvent | WheelEvent) {
+    const rect = this.canvas.getBoundingClientRect();
+    return {
+      x: (event.clientX - rect.left) * (this.canvas.width / rect.width),
+      y: (event.clientY - rect.top) * (this.canvas.height / rect.height),
+    };
+  }
+
+  private getWorldPointerEvent(event: MouseEvent): CanvasPointerEvent {
+    const point = this.getCanvasPoint(event);
+    const { offsetX, offsetY, zoom } = this.editor.viewport;
+    return {
+      x: (point.x - offsetX) / zoom,
+      y: (point.y - offsetY) / zoom,
+      shiftKey: event.shiftKey,
+    };
+  }
+
+  private zoomAt(screenX: number, screenY: number, targetZoom: number) {
+    const zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, targetZoom));
+    const viewport = this.editor.viewport;
+    const worldX = (screenX - viewport.offsetX) / viewport.zoom;
+    const worldY = (screenY - viewport.offsetY) / viewport.zoom;
+    this.editor.setViewport({
+      offsetX: screenX - worldX * zoom,
+      offsetY: screenY - worldY * zoom,
+      zoom,
+    });
   }
 }
 

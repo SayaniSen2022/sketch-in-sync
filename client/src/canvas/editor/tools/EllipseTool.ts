@@ -1,6 +1,6 @@
 import Scene from "@/canvas/scene/Scene";
 import EditorState from "../EditorState";
-import { ToolStrategy } from "./ToolStrategy";
+import { ToolStrategy, type CanvasPointerEvent } from "./ToolStrategy";
 import type { Ellipse } from "@/canvas/scene/Ellipse";
 
 class EllipseTool extends ToolStrategy {
@@ -12,13 +12,13 @@ class EllipseTool extends ToolStrategy {
     this.editor = editor;
   }
 
-  onMouseDown(event: MouseEvent): void {
+  onMouseDown(event: CanvasPointerEvent): void {
     const ellipse: Ellipse = {
       id: crypto.randomUUID(),
       type: "ellipse",
 
-      x: event.offsetX,
-      y: event.offsetY,
+      x: event.x,
+      y: event.y,
 
       width: 0,
       height: 0,
@@ -32,15 +32,15 @@ class EllipseTool extends ToolStrategy {
     this.editor.startDrawing(ellipse);
   }
 
-  onMouseMove(event: MouseEvent): void {
+  onMouseMove(event: CanvasPointerEvent): void {
     if (!this.editor.isDrawing) return;
 
     const shape = this.editor.currentShape;
 
     if (!shape || shape.type !== "ellipse") return;
 
-    shape.width = event.offsetX - shape.x;
-    shape.height = event.offsetY - shape.y;
+    shape.width = event.x - shape.x;
+    shape.height = event.y - shape.y;
   }
 
   onMouseUp(): void {

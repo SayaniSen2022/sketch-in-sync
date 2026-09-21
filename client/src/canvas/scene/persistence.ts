@@ -1,13 +1,15 @@
 import type { CanvasShape } from "./types";
 import { BACKGROUND_COLORS, DEFAULT_CANVAS_BACKGROUND } from "../stylePresets";
+import { DEFAULT_VIEWPORT, MAX_ZOOM, MIN_ZOOM, type Viewport } from "../viewport";
 
 const STORAGE_KEY = "sketch-in-sync:scene:v1";
-const STORAGE_VERSION = 2;
+const STORAGE_VERSION = 3;
 
 interface StoredDocument {
   version: number;
   shapes: CanvasShape[];
   backgroundColor: string;
+  viewport: Viewport;
 }
 
 interface StoredSceneV1 {
@@ -17,7 +19,11 @@ interface StoredSceneV1 {
 
 let hasReportedStorageError = false;
 
-export function loadStoredDocument(): { shapes: CanvasShape[]; backgroundColor: string } {
+export function loadStoredDocument(): {
+  shapes: CanvasShape[];
+  backgroundColor: string;
+  viewport: Viewport;
+} {
   try {
     const value = window.localStorage.getItem(STORAGE_KEY);
 
@@ -29,6 +35,7 @@ export function loadStoredDocument(): { shapes: CanvasShape[]; backgroundColor: 
       return {
         shapes: storedScene.shapes,
         backgroundColor: storedScene.backgroundColor,
+        viewport: storedScene.viewport,
       };
     }
 
@@ -36,6 +43,7 @@ export function loadStoredDocument(): { shapes: CanvasShape[]; backgroundColor: 
       return {
         shapes: storedScene.shapes,
         backgroundColor: DEFAULT_CANVAS_BACKGROUND,
+        viewport: { ...DEFAULT_VIEWPORT },
       };
     }
 
@@ -46,11 +54,16 @@ export function loadStoredDocument(): { shapes: CanvasShape[]; backgroundColor: 
   }
 }
 
-export function saveStoredDocument(shapes: CanvasShape[], backgroundColor: string): void {
+export function saveStoredDocument(
+  shapes: CanvasShape[],
+  backgroundColor: string,
+  viewport: Viewport,
+): void {
   const storedScene: StoredDocument = {
     version: STORAGE_VERSION,
     shapes,
     backgroundColor,
+    viewport,
   };
 
   try {
@@ -68,8 +81,12 @@ export function clearStoredDocument(): void {
   }
 }
 
-function emptyDocument(): { shapes: CanvasShape[]; backgroundColor: string } {
-  return { shapes: [], backgroundColor: DEFAULT_CANVAS_BACKGROUND };
+function emptyDocument(): { shapes: CanvasShape[]; backgroundColor: string; viewport: Viewport } {
+  return {
+    shapes: [],
+    backgroundColor: DEFAULT_CANVAS_BACKGROUND,
+    viewport: { ...DEFAULT_VIEWPORT },
+  };
 }
 
 function isStoredDocument(value: unknown): value is StoredDocument {
@@ -78,14 +95,25 @@ function isStoredDocument(value: unknown): value is StoredDocument {
     value.version === STORAGE_VERSION &&
     Array.isArray(value.shapes) &&
     isBackgroundColor(value.backgroundColor) &&
+    isViewport(value.viewport) &&
     value.shapes.every(isCanvasShape)
+  );
+}
+
+function isViewport(value: unknown): value is Viewport {
+  return (
+    isRecord(value) &&
+    hasNumbers(value, "offsetX", "offsetY", "zoom") &&
+    typeof value.zoom === "number" &&
+    value.zoom >= MIN_ZOOM &&
+    value.zoom <= MAX_ZOOM
   );
 }
 
 function isStoredSceneV1(value: unknown): value is StoredSceneV1 {
   return (
     isRecord(value) &&
-    value.version === 1 &&
+    (value.version === 1 || value.version === 2) &&
     Array.isArray(value.shapes) &&
     value.shapes.every(isCanvasShape)
   );

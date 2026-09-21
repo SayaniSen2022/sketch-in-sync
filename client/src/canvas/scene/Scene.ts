@@ -150,7 +150,7 @@ class Scene {
     return index;
   }
 
-  findShapeAt(x: number, y: number): CanvasShape | null {
+  findShapeAt(x: number, y: number, tolerance = 6): CanvasShape | null {
     // selection delete resize duplicate context menu
     const shapes = this.shapes;
 
@@ -189,14 +189,14 @@ class Scene {
           break;
         }
         case "line": {
-          if (this.isPointNearLine(x, y, shape.x1, shape.y1, shape.x2, shape.y2)) {
+          if (this.isPointNearLine(x, y, shape.x1, shape.y1, shape.x2, shape.y2, tolerance)) {
             return shape;
           }
 
           break;
         }
         case "arrow": {
-          if (this.isPointNearLine(x, y, shape.x1, shape.y1, shape.x2, shape.y2)) {
+          if (this.isPointNearLine(x, y, shape.x1, shape.y1, shape.x2, shape.y2, tolerance)) {
             return shape;
           }
 
@@ -212,7 +212,7 @@ class Scene {
           break;
         }
         case "pencil": {
-          if (this.isPointNearPencil(x, y, shape)) {
+          if (this.isPointNearPencil(x, y, shape, tolerance)) {
             return shape;
           }
 
@@ -249,21 +249,21 @@ class Scene {
 
     return Math.hypot(px - nearestX, py - nearestY) <= tolerance;
   }
-  private isPointNearPencil(px: number, py: number, pencil: Pencil): boolean {
-    const tolerance = Math.max(6, pencil.strokeWidth / 2);
+  private isPointNearPencil(px: number, py: number, pencil: Pencil, tolerance: number): boolean {
+    const hitTolerance = Math.max(tolerance, pencil.strokeWidth / 2);
 
     if (pencil.points.length === 0) return false;
 
     if (pencil.points.length === 1) {
       const point = pencil.points[0];
-      return Math.hypot(px - point.x, py - point.y) <= tolerance;
+      return Math.hypot(px - point.x, py - point.y) <= hitTolerance;
     }
 
     for (let i = 1; i < pencil.points.length; i++) {
       const start = pencil.points[i - 1];
       const end = pencil.points[i];
 
-      if (this.isPointNearLine(px, py, start.x, start.y, end.x, end.y, tolerance)) {
+      if (this.isPointNearLine(px, py, start.x, start.y, end.x, end.y, hitTolerance)) {
         return true;
       }
     }

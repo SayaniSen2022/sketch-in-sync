@@ -1,6 +1,6 @@
 import Scene from "@/canvas/scene/Scene";
 import EditorState from "../EditorState";
-import { ToolStrategy } from "./ToolStrategy";
+import { ToolStrategy, type CanvasPointerEvent } from "./ToolStrategy";
 import type { Text } from "@/canvas/scene";
 
 class TextTool extends ToolStrategy {
@@ -13,10 +13,10 @@ class TextTool extends ToolStrategy {
     this.editor = editor;
   }
 
-  onMouseDown(event: MouseEvent): void {
+  onMouseDown(event: CanvasPointerEvent): void {
     // Commit the in-progress draft, then start a fresh editing session here.
     this.commitText();
-    this.editor.startTextEditing(event.offsetX, event.offsetY);
+    this.editor.startTextEditing(event.x, event.y);
   }
 
   onMouseMove(): void {}

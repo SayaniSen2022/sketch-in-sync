@@ -37,10 +37,17 @@ const Canvas = () => {
     if (!editor?.textEditing || !textarea) return;
 
     textarea.style.width = "4px";
-    textarea.style.height = `${editor.textFontSize}px`;
+    const zoom = editor.viewport.zoom;
+    textarea.style.height = `${editor.textFontSize * zoom}px`;
     textarea.style.width = `${textarea.scrollWidth + 4}px`;
     textarea.style.height = `${textarea.scrollHeight + 4}px`;
-  }, [editor?.textEditing, editor?.textValue, editor?.textFontSize, editor?.textFontFamily]);
+  }, [
+    editor?.textEditing,
+    editor?.textValue,
+    editor?.textFontSize,
+    editor?.textFontFamily,
+    editor?.viewport.zoom,
+  ]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -63,6 +70,8 @@ const Canvas = () => {
     engine.setTool(tool);
 
     return () => engine.destroy();
+    // The engine is intentionally created once; later tool changes are forwarded directly above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleToolChange = (tool: Tool) => {
@@ -97,6 +106,10 @@ const Canvas = () => {
         currentTool={tool}
         onToolChange={handleToolChange}
         onClearCanvas={() => engine?.clearCanvas()}
+        zoom={editor?.viewport.zoom ?? 1}
+        onZoomIn={() => engine?.zoomBy(0.25)}
+        onZoomOut={() => engine?.zoomBy(-0.25)}
+        onResetZoom={() => engine?.resetZoom()}
       />
       <StyleSidebar
         editor={editor}
@@ -108,7 +121,7 @@ const Canvas = () => {
       />
 
       <canvas
-        className={`absolute inset-0w-full h-full ${
+        className={`absolute inset-0 h-full w-full ${
           tool === "select"
             ? "cursor-default"
             : tool === "text"
@@ -127,8 +140,8 @@ const Canvas = () => {
           onBlur={() => engineRef.current?.finishTextEditing()}
           style={{
             position: "fixed",
-            left: editor.textX,
-            top: editor.textY,
+            left: editor.textX * editor.viewport.zoom + editor.viewport.offsetX,
+            top: editor.textY * editor.viewport.zoom + editor.viewport.offsetY,
             padding: 0,
             margin: 0,
             border: "none",
@@ -139,9 +152,9 @@ const Canvas = () => {
             background: "transparent",
             color: "#fff",
             caretColor: "#fff",
-            fontSize: editor.textFontSize,
+            fontSize: editor.textFontSize * editor.viewport.zoom,
             fontFamily: editor.textFontFamily,
-            lineHeight: `${editor.textFontSize}px`,
+            lineHeight: `${editor.textFontSize * editor.viewport.zoom}px`,
             zIndex: 9999,
           }}
           name="text-val"

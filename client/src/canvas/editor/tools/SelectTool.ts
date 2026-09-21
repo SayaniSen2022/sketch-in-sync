@@ -1,4 +1,4 @@
-import { ToolStrategy } from "./ToolStrategy";
+import { ToolStrategy, type CanvasPointerEvent } from "./ToolStrategy";
 import Scene from "@/canvas/scene/Scene";
 import EditorState from "../EditorState";
 import type { CanvasShape, Pencil, Text } from "@/canvas/scene";
@@ -58,9 +58,9 @@ class SelectTool extends ToolStrategy {
     this.editor = editor;
   }
 
-  onMouseDown(event: MouseEvent): void {
-    const x = event.offsetX;
-    const y = event.offsetY;
+  onMouseDown(event: CanvasPointerEvent): void {
+    const x = event.x;
+    const y = event.y;
 
     const selectedShape =
       this.editor.selectedShapes.length === 1 ? this.editor.selectedShape : null;
@@ -96,7 +96,7 @@ class SelectTool extends ToolStrategy {
       }
     }
 
-    const shape = this.scene.findShapeAt(x, y);
+    const shape = this.scene.findShapeAt(x, y, 6 / this.editor.viewport.zoom);
     if (shape) {
       if (event.shiftKey) {
         this.editor.toggleSelectedShape(shape);
@@ -110,9 +110,9 @@ class SelectTool extends ToolStrategy {
     }
   }
 
-  onMouseMove(event: MouseEvent): void {
-    const x = event.offsetX;
-    const y = event.offsetY;
+  onMouseMove(event: CanvasPointerEvent): void {
+    const x = event.x;
+    const y = event.y;
 
     if (this.editor.isMarqueeSelecting) {
       this.editor.updateMarqueeSelection(x, y);
@@ -169,12 +169,12 @@ class SelectTool extends ToolStrategy {
   }
 
   /** Double-click a text shape to re-enter editing mode for it. */
-  onDoubleClick(event: MouseEvent): void {
-    const shape = this.scene.findShapeAt(event.offsetX, event.offsetY);
+  onDoubleClick(event: CanvasPointerEvent): void {
+    const shape = this.scene.findShapeAt(event.x, event.y, 6 / this.editor.viewport.zoom);
 
     if (!shape || shape.type !== "text") return;
 
-    const caretIndex = this.scene.getTextCaretIndex(shape, event.offsetX, event.offsetY);
+    const caretIndex = this.scene.getTextCaretIndex(shape, event.x, event.y);
 
     this.scene.removeShape(shape);
     this.editor.clearSelection();
@@ -209,7 +209,7 @@ class SelectTool extends ToolStrategy {
   }
 
   private getResizeHandle(x: number, y: number, shape: CanvasShape): string | null {
-    const handleSize = 8;
+    const handleSize = 8 / this.editor.viewport.zoom;
 
     switch (shape.type) {
       case "rectangle":
@@ -459,9 +459,12 @@ class SelectTool extends ToolStrategy {
     if (!bounds) return false;
 
     const centerX = (bounds.left + bounds.right) / 2;
-    const rotationHandleY = bounds.top - PENCIL_ROTATION_HANDLE_OFFSET;
+    const rotationHandleY = bounds.top - PENCIL_ROTATION_HANDLE_OFFSET / this.editor.viewport.zoom;
 
-    return Math.hypot(x - centerX, y - rotationHandleY) <= PENCIL_ROTATION_HANDLE_RADIUS;
+    return (
+      Math.hypot(x - centerX, y - rotationHandleY) <=
+      PENCIL_ROTATION_HANDLE_RADIUS / this.editor.viewport.zoom
+    );
   }
 
   private startPencilRotation(pencil: Pencil, x: number, y: number): void {
@@ -529,7 +532,7 @@ class SelectTool extends ToolStrategy {
   private getGroupResizeHandle(x: number, y: number): CornerHandle | null {
     const bounds = this.getGroupBounds();
     if (!bounds) return null;
-    const size = 8;
+    const size = 8 / this.editor.viewport.zoom;
     if (Math.abs(x - bounds.left) <= size && Math.abs(y - bounds.top) <= size) return "top-left";
     if (Math.abs(x - bounds.right) <= size && Math.abs(y - bounds.top) <= size) return "top-right";
     if (Math.abs(x - bounds.left) <= size && Math.abs(y - bounds.bottom) <= size)

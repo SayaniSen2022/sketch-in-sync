@@ -7,6 +7,7 @@ import {
   DEFAULT_TEXT_FONT_FAMILY,
   DEFAULT_TEXT_FONT_SIZE,
 } from "../stylePresets";
+import { DEFAULT_VIEWPORT, MAX_ZOOM, MIN_ZOOM, type Viewport } from "../viewport";
 
 interface TextEditingOptions {
   value?: string;
@@ -44,6 +45,7 @@ class EditorState {
   strokeColor: string = DEFAULT_STROKE_COLOR;
   strokeWidth: number = DEFAULT_STROKE_WIDTH;
   canvasBackgroundColor: string = DEFAULT_CANVAS_BACKGROUND;
+  viewport: Viewport = { ...DEFAULT_VIEWPORT };
 
   setTool(tool: Tool) {
     this.currentTool = tool;
@@ -173,6 +175,23 @@ class EditorState {
   setCanvasBackgroundColor(color: string) {
     this.canvasBackgroundColor = color;
     this.onChange?.();
+  }
+
+  setViewport(viewport: Viewport) {
+    this.viewport = {
+      offsetX: viewport.offsetX,
+      offsetY: viewport.offsetY,
+      zoom: Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, viewport.zoom)),
+    };
+    this.onChange?.();
+  }
+
+  panBy(deltaX: number, deltaY: number) {
+    this.setViewport({
+      ...this.viewport,
+      offsetX: this.viewport.offsetX + deltaX,
+      offsetY: this.viewport.offsetY + deltaY,
+    });
   }
 
   finishTextEditing() {

@@ -1,6 +1,6 @@
 import Scene from "@/canvas/scene/Scene";
 import EditorState from "../EditorState";
-import { ToolStrategy } from "./ToolStrategy";
+import { ToolStrategy, type CanvasPointerEvent } from "./ToolStrategy";
 import type { Line } from "@/canvas/scene";
 
 class LineTool extends ToolStrategy {
@@ -12,16 +12,16 @@ class LineTool extends ToolStrategy {
     this.editor = editor;
   }
 
-  onMouseDown(event: MouseEvent): void {
+  onMouseDown(event: CanvasPointerEvent): void {
     const line: Line = {
       id: crypto.randomUUID(),
       type: "line",
 
-      x1: event.offsetX,
-      y1: event.offsetY,
+      x1: event.x,
+      y1: event.y,
 
-      x2: event.offsetX,
-      y2: event.offsetY,
+      x2: event.x,
+      y2: event.y,
 
       strokeColor: this.editor.strokeColor,
       strokeWidth: this.editor.strokeWidth,
@@ -31,15 +31,15 @@ class LineTool extends ToolStrategy {
     this.editor.startDrawing(line);
   }
 
-  onMouseMove(event: MouseEvent): void {
+  onMouseMove(event: CanvasPointerEvent): void {
     if (!this.editor.isDrawing) return;
 
     const shape = this.editor.currentShape;
 
     if (!shape || shape.type !== "line") return;
 
-    shape.x2 = event.offsetX;
-    shape.y2 = event.offsetY;
+    shape.x2 = event.x;
+    shape.y2 = event.y;
   }
 
   onMouseUp(): void {

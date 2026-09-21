@@ -3,13 +3,19 @@
  * what they need. `commitText` has a no-op default (virtual-style) so the
  * engine can finish in-progress work without knowing the concrete tool.
  */
+export interface CanvasPointerEvent {
+  x: number;
+  y: number;
+  shiftKey: boolean;
+}
+
 export abstract class ToolStrategy {
-  abstract onMouseDown(event: MouseEvent): void;
-  abstract onMouseMove(event: MouseEvent): void;
-  abstract onMouseUp(event: MouseEvent): void;
+  abstract onMouseDown(event: CanvasPointerEvent): void;
+  abstract onMouseMove(event: CanvasPointerEvent): void;
+  abstract onMouseUp(event: CanvasPointerEvent): void;
 
   /** No-op default; tools override when they handle double-click. */
-  onDoubleClick(event: MouseEvent): void {
+  onDoubleClick(event: CanvasPointerEvent): void {
     // eslint-disable-next-line @typescript-eslint/no-unused-expressions
     event;
   }

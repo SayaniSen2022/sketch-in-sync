@@ -1,6 +1,6 @@
 import Scene from "@/canvas/scene/Scene";
 import EditorState from "../EditorState";
-import { ToolStrategy } from "./ToolStrategy";
+import { ToolStrategy, type CanvasPointerEvent } from "./ToolStrategy";
 import type { Rectangle } from "@/canvas/scene";
 
 class RectangleTool extends ToolStrategy {
@@ -12,13 +12,13 @@ class RectangleTool extends ToolStrategy {
     this.editor = editor;
   }
 
-  onMouseDown(event: MouseEvent): void {
+  onMouseDown(event: CanvasPointerEvent): void {
     const rect: Rectangle = {
       id: crypto.randomUUID(),
       type: "rectangle",
 
-      x: event.offsetX,
-      y: event.offsetY,
+      x: event.x,
+      y: event.y,
 
       width: 0,
       height: 0,
@@ -32,16 +32,14 @@ class RectangleTool extends ToolStrategy {
     this.editor.startDrawing(rect);
   }
 
-  onMouseMove(event: MouseEvent): void {
-    const { offsetX, offsetY } = event;
-
+  onMouseMove(event: CanvasPointerEvent): void {
     if (!this.editor.isDrawing) return;
 
     const shape = this.editor.currentShape;
 
     if (!shape || shape.type !== "rectangle") return;
-    shape.width = offsetX - shape.x;
-    shape.height = offsetY - shape.y;
+    shape.width = event.x - shape.x;
+    shape.height = event.y - shape.y;
   }
 
   onMouseUp(): void {

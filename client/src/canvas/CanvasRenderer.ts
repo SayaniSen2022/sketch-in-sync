@@ -6,6 +6,7 @@ import type { Pencil } from "./scene";
 import type { Text } from "./scene";
 import Scene from "./scene/Scene";
 import type EditorState from "./editor/EditorState";
+import type { Viewport } from "./viewport";
 
 class CanvasRenderer {
   private ctx: CanvasRenderingContext2D;
@@ -13,9 +14,12 @@ class CanvasRenderer {
   constructor(ctx: CanvasRenderingContext2D) {
     this.ctx = ctx;
   }
-  render(scene: Scene, editor: EditorState): void {
+  render(scene: Scene, editor: EditorState, viewport: Viewport): void {
     this.scene = scene;
     this.clearCanvas();
+    this.ctx.save();
+    this.ctx.translate(viewport.offsetX, viewport.offsetY);
+    this.ctx.scale(viewport.zoom, viewport.zoom);
 
     const shapes = scene.getShapes();
 
@@ -42,11 +46,13 @@ class CanvasRenderer {
           break;
       }
       if (editor.selectedShapes.length === 1 && shape === editor.selectedShape) {
-        this.drawSelection(shape);
+        this.drawSelection(shape, viewport.zoom);
       }
     }
-    if (editor.selectedShapes.length > 1) this.drawGroupSelection(editor.selectedShapes);
-    if (editor.isMarqueeSelecting) this.drawMarquee(editor);
+    if (editor.selectedShapes.length > 1)
+      this.drawGroupSelection(editor.selectedShapes, viewport.zoom);
+    if (editor.isMarqueeSelecting) this.drawMarquee(editor, viewport.zoom);
+    this.ctx.restore();
   }
 
   private clearCanvas(): void {
@@ -128,34 +134,34 @@ class CanvasRenderer {
     this.ctx.closePath();
   }
 
-  private drawSelection(shape: CanvasShape): void {
+  private drawSelection(shape: CanvasShape, zoom: number): void {
     switch (shape.type) {
       case "rectangle":
-        this.drawRectangleSelection(shape);
+        this.drawRectangleSelection(shape, zoom);
         break;
 
       case "ellipse":
-        this.drawEllipseSelection(shape);
+        this.drawEllipseSelection(shape, zoom);
         break;
 
       case "line":
-        this.drawLineSelection(shape);
+        this.drawLineSelection(shape, zoom);
         break;
 
       case "arrow":
-        this.drawArrowSelection(shape);
+        this.drawArrowSelection(shape, zoom);
         break;
 
       case "text":
-        this.drawTextSelection(shape);
+        this.drawTextSelection(shape, zoom);
         break;
 
       case "pencil":
-        this.drawPencilSelection(shape);
+        this.drawPencilSelection(shape, zoom);
         break;
     }
   }
-  private drawTextSelection(text: Text): void {
+  private drawTextSelection(text: Text, zoom: number): void {
     if (!this.scene) return;
 
     const bounds = this.scene.getTextBounds(text);
@@ -165,25 +171,32 @@ class CanvasRenderer {
       bounds.top,
       bounds.right - bounds.left,
       bounds.bottom - bounds.top,
+      zoom,
     );
   }
-  private drawSelectionBox(left: number, top: number, width: number, height: number): void {
+  private drawSelectionBox(
+    left: number,
+    top: number,
+    width: number,
+    height: number,
+    zoom: number,
+  ): void {
     this.ctx.save();
 
     this.ctx.strokeStyle = "#4EA8FF";
-    this.ctx.lineWidth = 2;
+    this.ctx.lineWidth = 2 / zoom;
     this.ctx.setLineDash([]);
 
     this.ctx.strokeRect(left, top, width, height);
 
-    this.drawHandle(left, top);
-    this.drawHandle(left + width, top);
-    this.drawHandle(left, top + height);
-    this.drawHandle(left + width, top + height);
+    this.drawHandle(left, top, zoom);
+    this.drawHandle(left + width, top, zoom);
+    this.drawHandle(left, top + height, zoom);
+    this.drawHandle(left + width, top + height, zoom);
 
     this.ctx.restore();
   }
-  private drawGroupSelection(shapes: CanvasShape[]): void {
+  private drawGroupSelection(shapes: CanvasShape[], zoom: number): void {
     if (!this.scene) return;
     const bounds = shapes
       .map((shape) => this.scene?.getShapeBounds(shape))
@@ -193,14 +206,15 @@ class CanvasRenderer {
     const top = Math.min(...bounds.map((bound) => bound.top));
     const right = Math.max(...bounds.map((bound) => bound.right));
     const bottom = Math.max(...bounds.map((bound) => bound.bottom));
-    this.drawSelectionBox(left, top, right - left, bottom - top);
+    this.drawSelectionBox(left, top, right - left, bottom - top, zoom);
   }
-  private drawMarquee(editor: EditorState): void {
+  private drawMarquee(editor: EditorState, zoom: number): void {
     const left = Math.min(editor.marqueeStartX, editor.marqueeEndX);
     const top = Math.min(editor.marqueeStartY, editor.marqueeEndY);
     this.ctx.save();
     this.ctx.strokeStyle = "#4EA8FF";
-    this.ctx.setLineDash([6, 4]);
+    this.ctx.lineWidth = 1 / zoom;
+    this.ctx.setLineDash([6 / zoom, 4 / zoom]);
     this.ctx.strokeRect(
       left,
       top,
@@ -209,32 +223,32 @@ class CanvasRenderer {
     );
     this.ctx.restore();
   }
-  private drawHandle(x: number, y: number): void {
-    const size = 8;
+  private drawHandle(x: number, y: number, zoom: number): void {
+    const size = 8 / zoom;
 
     this.ctx.beginPath();
     this.ctx.fillStyle = "#ffffff";
     this.ctx.strokeStyle = "#4EA8FF";
-    this.ctx.lineWidth = 2;
+    this.ctx.lineWidth = 2 / zoom;
 
     this.ctx.rect(x - size / 2, y - size / 2, size, size);
 
     this.ctx.fill();
     this.ctx.stroke();
   }
-  private drawRectangleSelection(rect: Rectangle): void {
+  private drawRectangleSelection(rect: Rectangle, zoom: number): void {
     const left = Math.min(rect.x, rect.x + rect.width);
     const top = Math.min(rect.y, rect.y + rect.height);
 
-    this.drawSelectionBox(left, top, Math.abs(rect.width), Math.abs(rect.height));
+    this.drawSelectionBox(left, top, Math.abs(rect.width), Math.abs(rect.height), zoom);
   }
-  private drawEllipseSelection(ellipse: Ellipse): void {
+  private drawEllipseSelection(ellipse: Ellipse, zoom: number): void {
     const left = Math.min(ellipse.x, ellipse.x + ellipse.width);
     const top = Math.min(ellipse.y, ellipse.y + ellipse.height);
 
-    this.drawSelectionBox(left, top, Math.abs(ellipse.width), Math.abs(ellipse.height));
+    this.drawSelectionBox(left, top, Math.abs(ellipse.width), Math.abs(ellipse.height), zoom);
   }
-  private drawPencilSelection(pencil: Pencil): void {
+  private drawPencilSelection(pencil: Pencil, zoom: number): void {
     if (!this.scene) return;
 
     const bounds = this.scene.getPencilBounds(pencil);
@@ -246,29 +260,30 @@ class CanvasRenderer {
       bounds.top,
       bounds.right - bounds.left,
       bounds.bottom - bounds.top,
+      zoom,
     );
 
     const centerX = (bounds.left + bounds.right) / 2;
-    const rotationHandleY = bounds.top - 24;
+    const rotationHandleY = bounds.top - 24 / zoom;
 
     this.ctx.save();
     this.ctx.strokeStyle = "#8B7CFF";
-    this.ctx.lineWidth = 2;
+    this.ctx.lineWidth = 2 / zoom;
     this.ctx.beginPath();
     this.ctx.moveTo(centerX, bounds.top);
     this.ctx.lineTo(centerX, rotationHandleY);
     this.ctx.stroke();
     this.ctx.restore();
 
-    this.drawLineHandle(centerX, rotationHandleY, true);
+    this.drawLineHandle(centerX, rotationHandleY, true, zoom);
   }
-  private drawLineHandle(x: number, y: number, filled = false): void {
+  private drawLineHandle(x: number, y: number, filled = false, zoom = 1): void {
     this.ctx.save();
 
     this.ctx.beginPath();
-    this.ctx.arc(x, y, 7, 0, Math.PI * 2);
+    this.ctx.arc(x, y, 7 / zoom, 0, Math.PI * 2);
 
-    this.ctx.lineWidth = 2;
+    this.ctx.lineWidth = 2 / zoom;
     this.ctx.strokeStyle = "#8B7CFF";
 
     if (filled) {
@@ -282,21 +297,21 @@ class CanvasRenderer {
     this.ctx.stroke();
     this.ctx.restore();
   }
-  private drawLineSelection(line: Line): void {
+  private drawLineSelection(line: Line, zoom: number): void {
     const midX = (line.x1 + line.x2) / 2;
     const midY = (line.y1 + line.y2) / 2;
 
-    this.drawLineHandle(line.x1, line.y1);
-    this.drawLineHandle(midX, midY, true);
-    this.drawLineHandle(line.x2, line.y2);
+    this.drawLineHandle(line.x1, line.y1, false, zoom);
+    this.drawLineHandle(midX, midY, true, zoom);
+    this.drawLineHandle(line.x2, line.y2, false, zoom);
   }
-  private drawArrowSelection(arrow: Arrow): void {
+  private drawArrowSelection(arrow: Arrow, zoom: number): void {
     const midX = (arrow.x1 + arrow.x2) / 2;
     const midY = (arrow.y1 + arrow.y2) / 2;
 
-    this.drawLineHandle(arrow.x1, arrow.y1);
-    this.drawLineHandle(midX, midY, true);
-    this.drawLineHandle(arrow.x2, arrow.y2);
+    this.drawLineHandle(arrow.x1, arrow.y1, false, zoom);
+    this.drawLineHandle(midX, midY, true, zoom);
+    this.drawLineHandle(arrow.x2, arrow.y2, false, zoom);
   }
   private drawPencil(pencil: Pencil): void {
     if (pencil.points.length < 2) return;
