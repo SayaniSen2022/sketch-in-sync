@@ -83,17 +83,15 @@ export default function TabBar({
                 {tab.title}
               </button>
             )}
-            {!tab.isDefault && (
-              <button
-                type="button"
-                aria-label={`Close ${tab.title}`}
-                title={`Close ${tab.title}`}
-                className="rounded p-0.5 text-neutral-300 hover:bg-neutral-500 hover:text-white"
-                onClick={() => onCloseTab(tab.id)}
-              >
-                <X size={14} aria-hidden="true" />
-              </button>
-            )}
+            <button
+              type="button"
+              aria-label={`Close ${tab.title}`}
+              title={`Close ${tab.title}`}
+              className="rounded p-0.5 text-neutral-300 hover:bg-neutral-500 hover:text-white"
+              onClick={() => onCloseTab(tab.id)}
+            >
+              <X size={14} aria-hidden="true" />
+            </button>
           </div>
         );
       })}

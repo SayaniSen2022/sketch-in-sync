@@ -45,7 +45,7 @@ function App() {
       clearStoredDocument(tabId);
 
       if (remainingTabs.length === 0) {
-        const replacement = createTab("Untitled 1", true);
+        const replacement = createTab("Untitled-1", true);
         setWorkspace({ tabs: [replacement], activeTabId: replacement.id });
         return;
       }
