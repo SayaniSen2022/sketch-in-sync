@@ -137,7 +137,7 @@ function getDocumentStorageKey(tabId: string): string {
 
 function emptyWorkspace(): { tabs: StoredCanvasTab[]; activeTabId: string } {
   return {
-    tabs: [{ id: DEFAULT_TAB_ID, title: "Untitled-1", isDefault: true }],
+    tabs: [{ id: DEFAULT_TAB_ID, title: "Untitled 1", isDefault: true }],
     activeTabId: DEFAULT_TAB_ID,
   };
 }

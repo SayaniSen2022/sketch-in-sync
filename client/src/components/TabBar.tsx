@@ -14,7 +14,10 @@ type TabBarProps = {
   onCreateTab: () => void;
   onRenameTab: (tabId: string, title: string) => void;
   onCloseTab: (tabId: string) => void;
+  onReorderTab: (tabId: string, destinationIndex: number) => void;
 };
+
+const DRAG_START_DISTANCE = 6;
 
 export default function TabBar({
   tabs,
@@ -23,10 +26,21 @@ export default function TabBar({
   onCreateTab,
   onRenameTab,
   onCloseTab,
+  onReorderTab,
 }: TabBarProps) {
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState("");
+  const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
+  const tabBarRef = useRef<HTMLElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const dragRef = useRef<{
+    tabId: string;
+    pointerId: number;
+    startX: number;
+    startY: number;
+    isDragging: boolean;
+  } | null>(null);
+  const suppressClickRef = useRef(false);
 
   const beginRenaming = (tab: CanvasTab) => {
     setEditingTabId(tab.id);
@@ -42,10 +56,74 @@ export default function TabBar({
     setEditingTabId(null);
   };
 
+  const finishDragging = () => {
+    const drag = dragRef.current;
+    if (!drag) return;
+
+    dragRef.current = null;
+    setDraggedTabId(null);
+
+    if (drag.isDragging) {
+      suppressClickRef.current = true;
+      window.setTimeout(() => {
+        suppressClickRef.current = false;
+      }, 0);
+    }
+  };
+
+  const handleLabelPointerDown = (event: React.PointerEvent<HTMLButtonElement>, tabId: string) => {
+    if (event.button !== 0) return;
+
+    dragRef.current = {
+      tabId,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      isDragging: false,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleLabelPointerMove = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    const movedDistance = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
+    if (!drag.isDragging && movedDistance < DRAG_START_DISTANCE) return;
+
+    if (!drag.isDragging) {
+      drag.isDragging = true;
+      setDraggedTabId(drag.tabId);
+    }
+
+    const tabBar = tabBarRef.current;
+    if (!tabBar) return;
+
+    const tabElements = Array.from(tabBar.querySelectorAll<HTMLElement>("[data-tab-id]"));
+    const destinationIndex = tabElements.findIndex((tabElement) => {
+      const bounds = tabElement.getBoundingClientRect();
+      return event.clientX < bounds.left + bounds.width / 2;
+    });
+    const targetIndex = destinationIndex === -1 ? tabs.length - 1 : destinationIndex;
+
+    onReorderTab(drag.tabId, targetIndex);
+  };
+
+  const handleLabelPointerUp = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    finishDragging();
+  };
+
   return (
     <nav
+      ref={tabBarRef}
       aria-label="Canvas tabs"
-      className="absolute z-[200] top-0 left-0 flex w-full items-center overflow-x-auto border border-white/10 bg-neutral-950 text-white shadow-xl"
+      className="absolute z-[200] top-0 left-0 flex w-full items-center overflow-hidden border border-white/10 bg-neutral-950 text-white shadow-xl"
     >
       {tabs.map((tab) => {
         const isActive = tab.id === activeTabId;
@@ -54,8 +132,13 @@ export default function TabBar({
         return (
           <div
             key={tab.id}
-            className={`flex items-center gap-1 px-2 py-1 border-r border-neutral-700 text-sm ${
-              isActive ? "bg-neutral-600" : "hover:bg-neutral-700"
+            data-tab-id={tab.id}
+            className={`flex w-40 min-w-0 shrink items-center gap-1 border-r border-neutral-700 px-2 py-1 text-sm ${
+              draggedTabId === tab.id
+                ? "cursor-grabbing bg-neutral-500 opacity-60"
+                : isActive
+                  ? "bg-neutral-600"
+                  : "hover:bg-neutral-700"
             }`}
           >
             {isEditing ? (
@@ -74,10 +157,21 @@ export default function TabBar({
             ) : (
               <button
                 type="button"
-                className="max-w-36 truncate text-left"
+                className={`min-w-0 flex-1 touch-none truncate text-left ${
+                  draggedTabId === tab.id ? "cursor-grabbing" : "cursor-grab"
+                }`}
                 aria-current={isActive ? "page" : undefined}
-                onClick={() => onSelectTab(tab.id)}
-                onDoubleClick={() => beginRenaming(tab)}
+                onClick={() => {
+                  if (suppressClickRef.current) return;
+                  onSelectTab(tab.id);
+                }}
+                onDoubleClick={() => {
+                  if (!dragRef.current) beginRenaming(tab);
+                }}
+                onPointerDown={(event) => handleLabelPointerDown(event, tab.id)}
+                onPointerMove={handleLabelPointerMove}
+                onPointerUp={handleLabelPointerUp}
+                onPointerCancel={finishDragging}
                 title={`${tab.title} — double-click to rename`}
               >
                 {tab.title}
@@ -87,7 +181,7 @@ export default function TabBar({
               type="button"
               aria-label={`Close ${tab.title}`}
               title={`Close ${tab.title}`}
-              className="rounded p-0.5 text-neutral-300 hover:bg-neutral-500 hover:text-white"
+              className="shrink-0 cursor-pointer rounded p-0.5 text-neutral-300 hover:bg-neutral-500 hover:text-white"
               onClick={() => onCloseTab(tab.id)}
             >
               <X size={14} aria-hidden="true" />
@@ -99,7 +193,7 @@ export default function TabBar({
         type="button"
         aria-label="New tab"
         title="New tab"
-        className="rounded p-1 text-neutral-300 hover:bg-neutral-700 hover:text-white"
+        className="shrink-0 cursor-pointer border-l border-neutral-700 p-1 text-neutral-300 hover:bg-neutral-700 hover:text-white"
         onClick={onCreateTab}
       >
         <Plus size={18} aria-hidden="true" />

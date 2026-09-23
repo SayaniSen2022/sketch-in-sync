@@ -35,6 +35,25 @@ function App() {
     }));
   };
 
+  const reorderTab = (tabId: string, destinationIndex: number) => {
+    setWorkspace((currentWorkspace) => {
+      const sourceIndex = currentWorkspace.tabs.findIndex((tab) => tab.id === tabId);
+      if (sourceIndex === -1) return currentWorkspace;
+
+      const clampedDestination = Math.max(
+        0,
+        Math.min(destinationIndex, currentWorkspace.tabs.length - 1),
+      );
+      if (sourceIndex === clampedDestination) return currentWorkspace;
+
+      const nextTabs = [...currentWorkspace.tabs];
+      const [tab] = nextTabs.splice(sourceIndex, 1);
+      nextTabs.splice(clampedDestination, 0, tab);
+
+      return { ...currentWorkspace, tabs: nextTabs };
+    });
+  };
+
   const closeTab = useCallback(
     (tabId: string) => {
       const tab = tabs.find((candidate) => candidate.id === tabId);
@@ -45,7 +64,7 @@ function App() {
       clearStoredDocument(tabId);
 
       if (remainingTabs.length === 0) {
-        const replacement = createTab("Untitled-1", true);
+        const replacement = createTab("Untitled 1", true);
         setWorkspace({ tabs: [replacement], activeTabId: replacement.id });
         return;
       }
@@ -97,6 +116,7 @@ function App() {
         onCreateTab={createNewTab}
         onRenameTab={renameTab}
         onCloseTab={setPendingCloseTabId}
+        onReorderTab={reorderTab}
       />
       {pendingCloseTab && (
         <CloseTabModal
