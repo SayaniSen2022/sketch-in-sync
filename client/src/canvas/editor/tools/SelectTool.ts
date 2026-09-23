@@ -110,6 +110,27 @@ class SelectTool extends ToolStrategy {
     }
   }
 
+  public getCursor(event: CanvasPointerEvent): string {
+    if (this.editor.isResizing) {
+      return this.getResizeCursor(this.editor.resizeHandle, this.editor.selectedShape);
+    }
+
+    const { x, y } = event;
+
+    if (this.editor.selectedShapes.length > 1) {
+      return this.getResizeCursor(this.getGroupResizeHandle(x, y));
+    }
+
+    const selectedShape = this.editor.selectedShape;
+    if (!selectedShape) return "default";
+
+    if (selectedShape.type === "pencil" && this.isPencilRotationHandle(x, y, selectedShape)) {
+      return "grab";
+    }
+
+    return this.getResizeCursor(this.getResizeHandle(x, y, selectedShape), selectedShape);
+  }
+
   onMouseMove(event: CanvasPointerEvent): void {
     const x = event.x;
     const y = event.y;
@@ -374,6 +395,24 @@ class SelectTool extends ToolStrategy {
 
   private isCornerHandle(handle: string): handle is CornerHandle {
     return ["top-left", "top-right", "bottom-left", "bottom-right"].includes(handle);
+  }
+
+  private getResizeCursor(handle: string | null, shape?: CanvasShape | null): string {
+    switch (handle) {
+      case "top-left":
+      case "bottom-right":
+        return "nwse-resize";
+      case "top-right":
+      case "bottom-left":
+        return "nesw-resize";
+      case "start":
+      case "end":
+        return shape?.type === "line" || shape?.type === "arrow" ? "pointer" : "default";
+      case "rotate":
+        return "grabbing";
+      default:
+        return "default";
+    }
   }
 
   private startTextResize(text: Text, handle: CornerHandle): void {

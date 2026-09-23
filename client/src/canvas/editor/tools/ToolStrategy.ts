@@ -20,6 +20,13 @@ export abstract class ToolStrategy {
     event;
   }
 
+  /** Returns the cursor to display while hovering this tool's canvas affordances. */
+  getCursor(event: CanvasPointerEvent): string {
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+    event;
+    return "default";
+  }
+
   /** Commits in-progress work (primarily used by the text tool). */
   commitText(): void {}
 }

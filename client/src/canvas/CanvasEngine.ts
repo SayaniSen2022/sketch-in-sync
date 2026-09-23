@@ -88,6 +88,7 @@ class CanvasEngine {
       this.activeTool.commitText();
       this.saveScene();
       this.editor.setTool(tool);
+      this.updateCursor();
       this.render();
       return;
     }
@@ -105,6 +106,7 @@ class CanvasEngine {
 
     this.editor.setTool(tool);
     this.activeTool = nextTool;
+    this.updateCursor();
     this.render();
   }
 
@@ -245,6 +247,7 @@ class CanvasEngine {
       const point = this.getCanvasPoint(event);
       this.panStartX = point.x;
       this.panStartY = point.y;
+      this.canvas.style.cursor = "grabbing";
       return;
     }
 
@@ -252,6 +255,7 @@ class CanvasEngine {
     this.execute(() => {
       this.activeTool.onMouseDown(this.getWorldPointerEvent(event));
     });
+    this.updateCursor(this.getWorldPointerEvent(event));
   };
 
   private handleMouseMove = (event: MouseEvent) => {
@@ -260,22 +264,26 @@ class CanvasEngine {
       this.editor.panBy(point.x - this.panStartX, point.y - this.panStartY);
       this.panStartX = point.x;
       this.panStartY = point.y;
+      this.canvas.style.cursor = "grabbing";
       return;
     }
     this.execute(() => {
       this.activeTool.onMouseMove(this.getWorldPointerEvent(event));
     });
+    this.updateCursor(this.getWorldPointerEvent(event));
   };
 
   private handleMouseUp = (event: MouseEvent) => {
     if (this.isPanning) {
       this.isPanning = false;
       this.saveScene();
+      this.updateCursor();
       return;
     }
     this.execute(() => {
       this.activeTool.onMouseUp(this.getWorldPointerEvent(event));
     });
+    this.updateCursor(this.getWorldPointerEvent(event));
     this.saveScene();
   };
 
@@ -329,6 +337,15 @@ class CanvasEngine {
   private execute(action: () => void) {
     action();
     this.render();
+  }
+
+  private updateCursor(event?: CanvasPointerEvent) {
+    if (this.editor.currentTool !== "select") {
+      this.canvas.style.cursor = "";
+      return;
+    }
+
+    this.canvas.style.cursor = event ? this.tools.select.getCursor(event) : "default";
   }
 
   private handleResize = () => {
