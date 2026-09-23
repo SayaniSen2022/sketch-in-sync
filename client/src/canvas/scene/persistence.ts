@@ -2,8 +2,13 @@ import type { CanvasShape } from "./types";
 import { BACKGROUND_COLORS, DEFAULT_CANVAS_BACKGROUND } from "../stylePresets";
 import { DEFAULT_VIEWPORT, MAX_ZOOM, MIN_ZOOM, type Viewport } from "../viewport";
 
-const STORAGE_KEY = "sketch-in-sync:scene:v1";
+const LEGACY_STORAGE_KEY = "sketch-in-sync:scene:v1";
+const DOCUMENT_STORAGE_PREFIX = "sketch-in-sync:scene:v1:";
+const WORKSPACE_STORAGE_KEY = "sketch-in-sync:tabs:v1";
 const STORAGE_VERSION = 3;
+const WORKSPACE_VERSION = 1;
+
+export const DEFAULT_TAB_ID = "default";
 
 interface StoredDocument {
   version: number;
@@ -17,15 +22,29 @@ interface StoredSceneV1 {
   shapes: CanvasShape[];
 }
 
+export interface StoredCanvasTab {
+  id: string;
+  title: string;
+  isDefault: boolean;
+}
+
+interface StoredWorkspace {
+  version: number;
+  tabs: StoredCanvasTab[];
+  activeTabId: string;
+}
+
 let hasReportedStorageError = false;
 
-export function loadStoredDocument(): {
+export function loadStoredDocument(tabId = DEFAULT_TAB_ID): {
   shapes: CanvasShape[];
   backgroundColor: string;
   viewport: Viewport;
 } {
   try {
-    const value = window.localStorage.getItem(STORAGE_KEY);
+    const value =
+      window.localStorage.getItem(getDocumentStorageKey(tabId)) ??
+      (tabId === DEFAULT_TAB_ID ? window.localStorage.getItem(LEGACY_STORAGE_KEY) : null);
 
     if (!value) return emptyDocument();
 
@@ -58,6 +77,7 @@ export function saveStoredDocument(
   shapes: CanvasShape[],
   backgroundColor: string,
   viewport: Viewport,
+  tabId = DEFAULT_TAB_ID,
 ): void {
   const storedScene: StoredDocument = {
     version: STORAGE_VERSION,
@@ -67,18 +87,59 @@ export function saveStoredDocument(
   };
 
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(storedScene));
+    window.localStorage.setItem(getDocumentStorageKey(tabId), JSON.stringify(storedScene));
   } catch {
     reportStorageError();
   }
 }
 
-export function clearStoredDocument(): void {
+export function clearStoredDocument(tabId = DEFAULT_TAB_ID): void {
   try {
-    window.localStorage.removeItem(STORAGE_KEY);
+    window.localStorage.removeItem(getDocumentStorageKey(tabId));
   } catch {
     reportStorageError();
   }
+}
+
+export function loadStoredWorkspace(): { tabs: StoredCanvasTab[]; activeTabId: string } {
+  try {
+    const value = window.localStorage.getItem(WORKSPACE_STORAGE_KEY);
+
+    if (!value) return emptyWorkspace();
+
+    const workspace: unknown = JSON.parse(value);
+    if (!isStoredWorkspace(workspace)) return emptyWorkspace();
+
+    return { tabs: workspace.tabs, activeTabId: workspace.activeTabId };
+  } catch {
+    reportStorageError();
+    return emptyWorkspace();
+  }
+}
+
+export function saveStoredWorkspace(tabs: StoredCanvasTab[], activeTabId: string): void {
+  const workspace: StoredWorkspace = {
+    version: WORKSPACE_VERSION,
+    tabs,
+    activeTabId,
+  };
+
+  try {
+    window.localStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify(workspace));
+  } catch {
+    reportStorageError();
+  }
+}
+
+function getDocumentStorageKey(tabId: string): string {
+  return `${DOCUMENT_STORAGE_PREFIX}${encodeURIComponent(tabId)}`;
+}
+
+function emptyWorkspace(): { tabs: StoredCanvasTab[]; activeTabId: string } {
+  return {
+    tabs: [{ id: DEFAULT_TAB_ID, title: "Untitled 1", isDefault: true }],
+    activeTabId: DEFAULT_TAB_ID,
+  };
 }
 
 function emptyDocument(): { shapes: CanvasShape[]; backgroundColor: string; viewport: Viewport } {
@@ -97,6 +158,24 @@ function isStoredDocument(value: unknown): value is StoredDocument {
     isBackgroundColor(value.backgroundColor) &&
     isViewport(value.viewport) &&
     value.shapes.every(isCanvasShape)
+  );
+}
+
+function isStoredWorkspace(value: unknown): value is StoredWorkspace {
+  return (
+    isRecord(value) &&
+    value.version === WORKSPACE_VERSION &&
+    typeof value.activeTabId === "string" &&
+    Array.isArray(value.tabs) &&
+    value.tabs.length > 0 &&
+    value.tabs.every(
+      (tab) =>
+        isRecord(tab) &&
+        isNonEmptyString(tab.id) &&
+        isNonEmptyString(tab.title) &&
+        typeof tab.isDefault === "boolean",
+    ) &&
+    value.tabs.some((tab) => tab.id === value.activeTabId)
   );
 }
 

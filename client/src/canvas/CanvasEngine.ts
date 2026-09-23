@@ -21,6 +21,7 @@ const AUTOSAVE_DELAY_MS = 350;
 
 class CanvasEngine {
   private canvas: HTMLCanvasElement;
+  private readonly tabId: string;
   private ctx: CanvasRenderingContext2D | null = null;
 
   private scene = new Scene();
@@ -31,13 +32,15 @@ class CanvasEngine {
   private tools!: Record<Exclude<Tool, "hand">, ToolStrategy>;
   private activeTool!: ToolStrategy;
   private saveTimer: number | null = null;
+  private shouldPersistOnDestroy = true;
   private isSpacePressed = false;
   private isPanning = false;
   private panStartX = 0;
   private panStartY = 0;
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, tabId: string) {
     this.canvas = canvas;
+    this.tabId = tabId;
   }
 
   init() {
@@ -48,7 +51,7 @@ class CanvasEngine {
     }
 
     this.renderer = new CanvasRenderer(this.ctx);
-    const storedDocument = loadStoredDocument();
+    const storedDocument = loadStoredDocument(this.tabId);
     this.scene.replaceShapes(storedDocument.shapes);
     this.editor.setCanvasBackgroundColor(storedDocument.backgroundColor);
     this.editor.setViewport(storedDocument.viewport);
@@ -77,6 +80,7 @@ class CanvasEngine {
     this.attachEventListeners();
 
     this.render(false);
+    this.saveScene();
   }
 
   public setTool(tool: Tool) {
@@ -340,9 +344,18 @@ class CanvasEngine {
     }
   }
 
+  public discardOnDestroy() {
+    this.shouldPersistOnDestroy = false;
+    this.cancelScheduledSave();
+  }
+
   destroy() {
-    this.activeTool.commitText();
-    this.saveScene();
+    if (this.shouldPersistOnDestroy) {
+      this.activeTool.commitText();
+      this.saveScene();
+    } else {
+      this.cancelScheduledSave();
+    }
 
     window.removeEventListener("resize", this.handleResize);
 
@@ -376,6 +389,7 @@ class CanvasEngine {
       this.scene.getShapes(),
       this.editor.canvasBackgroundColor,
       this.editor.viewport,
+      this.tabId,
     );
   }
 

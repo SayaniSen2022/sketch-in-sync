@@ -6,7 +6,13 @@ import StyleSidebar from "./StyleSidebar";
 import EditorState from "@/canvas/editor/EditorState";
 import { DEFAULT_CANVAS_BACKGROUND } from "@/canvas/stylePresets";
 
-const Canvas = () => {
+type CanvasProps = {
+  tabId: string;
+  discardOnUnmount?: boolean;
+  onDiscardReady?: () => void;
+};
+
+const Canvas = ({ tabId, discardOnUnmount = false, onDiscardReady }: CanvasProps) => {
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [, forceUpdate] = useState(0);
   //reference to the real DOM element. When React mounts the component, internally it creates the canvas element
@@ -53,7 +59,7 @@ const Canvas = () => {
 
     if (!canvas) return;
 
-    const engine = new CanvasEngine(canvas);
+    const engine = new CanvasEngine(canvas, tabId);
     engineRef.current = engine;
     engine.init();
 
@@ -72,6 +78,13 @@ const Canvas = () => {
     // The engine is intentionally created once; later tool changes are forwarded directly above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!discardOnUnmount) return;
+
+    engineRef.current?.discardOnDestroy();
+    onDiscardReady?.();
+  }, [discardOnUnmount, onDiscardReady]);
 
   const handleToolChange = (tool: Tool) => {
     setTool(tool);

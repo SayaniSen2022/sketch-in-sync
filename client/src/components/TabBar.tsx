@@ -45,7 +45,7 @@ export default function TabBar({
   return (
     <nav
       aria-label="Canvas tabs"
-      className="absolute z-[200] top-0 left-0 flex w-full items-center overflow-x-auto border border-white/10 bg-neutral-800 text-white shadow-xl"
+      className="absolute z-[200] top-0 left-0 flex w-full items-center overflow-x-auto border border-white/10 bg-neutral-950 text-white shadow-xl"
     >
       {tabs.map((tab) => {
         const isActive = tab.id === activeTabId;
@@ -54,7 +54,7 @@ export default function TabBar({
         return (
           <div
             key={tab.id}
-            className={`flex items-center gap-1 px-2 py-1 border-r border-neutral-800 text-sm ${
+            className={`flex items-center gap-1 px-2 py-1 border-r border-neutral-700 text-sm ${
               isActive ? "bg-neutral-600" : "hover:bg-neutral-700"
             }`}
           >
