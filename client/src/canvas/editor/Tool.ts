@@ -1,1 +1,2 @@
-export type Tool = "select" | "rectangle" | "ellipse" | "line" | "arrow" | "text" | "pencil";
+export type Tool =
+  "select" | "hand" | "rectangle" | "ellipse" | "line" | "arrow" | "text" | "pencil" | "eraser";

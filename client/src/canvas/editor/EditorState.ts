@@ -17,7 +17,7 @@ interface TextEditingOptions {
 }
 
 class EditorState {
-  currentTool: Tool = "rectangle";
+  currentTool: Tool = "select";
   isDrawing = false;
   selectedShapes: CanvasShape[] = [];
   isMarqueeSelecting = false;
@@ -85,6 +85,7 @@ class EditorState {
         case "text":
           this.textFontSize = shape.fontSize;
           this.textFontFamily = shape.fontFamily;
+          this.strokeColor = shape.fillColor;
           break;
       }
     }

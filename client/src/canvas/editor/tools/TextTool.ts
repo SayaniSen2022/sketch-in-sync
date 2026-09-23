@@ -41,7 +41,7 @@ class TextTool extends ToolStrategy {
       text: this.editor.textValue,
       fontSize: this.editor.textFontSize,
       fontFamily: this.editor.textFontFamily,
-      fillColor: "#fff",
+      fillColor: this.editor.strokeColor,
     };
 
     this.scene.addShape(textShape);

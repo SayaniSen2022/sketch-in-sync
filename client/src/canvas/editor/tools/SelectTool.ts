@@ -199,6 +199,7 @@ class SelectTool extends ToolStrategy {
       shape.text = this.editor.textValue;
       shape.fontSize = this.editor.textFontSize;
       shape.fontFamily = this.editor.textFontFamily;
+      shape.fillColor = this.editor.strokeColor;
       this.scene.addShape(shape);
       this.editor.setSelectedShape(shape);
     } else {

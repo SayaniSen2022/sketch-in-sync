@@ -13,6 +13,7 @@ import ArrowTool from "./editor/tools/ArrowTool";
 import SelectTool from "./editor/tools/SelectTool";
 import PencilTool from "./editor/tools/PencilTool";
 import TextTool from "./editor/tools/TextTool";
+import EraserTool from "./editor/tools/EraserTool";
 import { loadStoredDocument, saveStoredDocument } from "./scene/persistence";
 import { MAX_ZOOM, MIN_ZOOM } from "./viewport";
 
@@ -27,7 +28,7 @@ class CanvasEngine {
 
   private editor = new EditorState();
 
-  private tools!: Record<Tool, ToolStrategy>;
+  private tools!: Record<Exclude<Tool, "hand">, ToolStrategy>;
   private activeTool!: ToolStrategy;
   private saveTimer: number | null = null;
   private isSpacePressed = false;
@@ -66,9 +67,11 @@ class CanvasEngine {
       text: new TextTool(this.scene, this.editor),
 
       select: new SelectTool(this.scene, this.editor),
+
+      eraser: new EraserTool(this.scene, this.editor),
     };
 
-    this.activeTool = this.tools[this.editor.currentTool];
+    this.activeTool = this.tools.select;
 
     this.resizeCanvas();
     this.attachEventListeners();
@@ -77,6 +80,14 @@ class CanvasEngine {
   }
 
   public setTool(tool: Tool) {
+    if (tool === "hand") {
+      this.activeTool.commitText();
+      this.saveScene();
+      this.editor.setTool(tool);
+      this.render();
+      return;
+    }
+
     const nextTool = this.tools[tool];
 
     if (!nextTool) {
@@ -110,6 +121,9 @@ class CanvasEngine {
         case "arrow":
         case "pencil":
           shape.strokeColor = color;
+          break;
+        case "text":
+          shape.fillColor = color;
           break;
       }
     });
@@ -218,7 +232,10 @@ class CanvasEngine {
   }
 
   private handleMouseDown = (event: MouseEvent) => {
-    if (event.button === 1 || (event.button === 0 && this.isSpacePressed)) {
+    if (
+      event.button === 1 ||
+      (event.button === 0 && (this.isSpacePressed || this.editor.currentTool === "hand"))
+    ) {
       event.preventDefault();
       this.isPanning = true;
       const point = this.getCanvasPoint(event);
@@ -265,9 +282,14 @@ class CanvasEngine {
   };
 
   private handleWheel = (event: WheelEvent) => {
-    if (!event.ctrlKey && !event.metaKey) return;
-
     event.preventDefault();
+
+    if (!event.ctrlKey && !event.metaKey) {
+      const deltaMultiplier = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 16 : 1;
+      this.editor.panBy(-event.deltaX * deltaMultiplier, -event.deltaY * deltaMultiplier);
+      return;
+    }
+
     const point = this.getCanvasPoint(event);
     const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
     this.zoomAt(point.x, point.y, this.editor.viewport.zoom * factor);
@@ -276,6 +298,14 @@ class CanvasEngine {
   private handleKeyDown = (event: KeyboardEvent) => {
     if (event.code === "Space" && !(event.target instanceof HTMLTextAreaElement)) {
       this.isSpacePressed = true;
+      event.preventDefault();
+      return;
+    }
+    if (
+      (event.code === "ArrowUp" || event.code === "ArrowDown") &&
+      !(event.target instanceof HTMLTextAreaElement)
+    ) {
+      this.editor.panBy(0, event.code === "ArrowUp" ? 48 : -48);
       event.preventDefault();
       return;
     }

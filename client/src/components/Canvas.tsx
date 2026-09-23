@@ -12,7 +12,7 @@ const Canvas = () => {
   //reference to the real DOM element. When React mounts the component, internally it creates the canvas element
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<CanvasEngine | null>(null);
-  const [tool, setTool] = useState<Tool>("rectangle");
+  const [tool, setTool] = useState<Tool>("select");
 
   const textInputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -30,7 +30,6 @@ const Canvas = () => {
     });
   }, [editor?.textEditing, editor?.textX, editor?.textY, editor?.textCaretIndex]);
 
-  // Grow the textarea to fit its content; the DOM renders the draft while editing.
   useEffect(() => {
     const textarea = textInputRef.current;
 
@@ -117,16 +116,19 @@ const Canvas = () => {
         onStrokeWidthChange={(width) => engine?.setStrokeWidth(width)}
         onTextFontSizeChange={(size) => engine?.setTextFontSize(size)}
         onTextFontFamilyChange={(fontFamily) => engine?.setTextFontFamily(fontFamily)}
-        onBackgroundColorChange={(color) => engine?.setCanvasBackgroundColor(color)}
       />
 
       <canvas
         className={`absolute inset-0 h-full w-full ${
           tool === "select"
             ? "cursor-default"
-            : tool === "text"
-              ? "cursor-text"
-              : "cursor-crosshair"
+            : tool === "hand"
+              ? "cursor-grab"
+              : tool === "eraser"
+                ? "cursor-eraser"
+                : tool === "text"
+                  ? "cursor-text"
+                  : "cursor-crosshair"
         }`}
         ref={canvasRef}
       />
@@ -150,8 +152,8 @@ const Canvas = () => {
             overflow: "hidden",
             whiteSpace: "pre",
             background: "transparent",
-            color: "#fff",
-            caretColor: "#fff",
+            color: editor.strokeColor,
+            caretColor: editor.strokeColor,
             fontSize: editor.textFontSize * editor.viewport.zoom,
             fontFamily: editor.textFontFamily,
             lineHeight: `${editor.textFontSize * editor.viewport.zoom}px`,
