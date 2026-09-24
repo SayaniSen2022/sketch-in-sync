@@ -19,6 +19,8 @@ import { MAX_ZOOM, MIN_ZOOM } from "./viewport";
 
 const AUTOSAVE_DELAY_MS = 350;
 
+const ONE_SHOT_DRAWING_TOOLS = new Set<Tool>(["rectangle", "ellipse", "line", "arrow", "pencil"]);
+
 class CanvasEngine {
   private canvas: HTMLCanvasElement;
   private readonly tabId: string;
@@ -37,6 +39,9 @@ class CanvasEngine {
   private isPanning = false;
   private panStartX = 0;
   private panStartY = 0;
+  private drawingStart: { x: number; y: number } | null = null;
+  private hasMovedWhileDrawing = false;
+  private onToolChange: ((tool: Tool) => void) | null = null;
 
   constructor(canvas: HTMLCanvasElement, tabId: string) {
     this.canvas = canvas;
@@ -88,6 +93,7 @@ class CanvasEngine {
       this.activeTool.commitText();
       this.saveScene();
       this.editor.setTool(tool);
+      this.onToolChange?.(tool);
       this.updateCursor();
       this.render();
       return;
@@ -106,6 +112,7 @@ class CanvasEngine {
 
     this.editor.setTool(tool);
     this.activeTool = nextTool;
+    this.onToolChange?.(tool);
     this.updateCursor();
     this.render();
   }
@@ -114,8 +121,19 @@ class CanvasEngine {
    * Commits the active tool's in-progress work (e.g. the text draft), if any.
    */
   public finishTextEditing() {
-    this.activeTool.commitText();
+    const committedShape = this.activeTool.commitText();
+
+    if (this.editor.currentTool === "text" && committedShape) {
+      this.editor.setSelectedShape(committedShape);
+      this.switchToSelectTool();
+      this.render(false);
+    }
+
     this.saveScene();
+  }
+
+  public setOnToolChange(callback: (tool: Tool) => void) {
+    this.onToolChange = callback;
   }
 
   public setStrokeColor(color: string) {
@@ -252,10 +270,23 @@ class CanvasEngine {
     }
 
     if (event.button !== 0) return;
+
+    if (this.editor.currentTool === "text" && this.editor.textEditing) {
+      this.finishTextEditing();
+      return;
+    }
+
+    const pointerEvent = this.getWorldPointerEvent(event);
+
+    if (ONE_SHOT_DRAWING_TOOLS.has(this.editor.currentTool)) {
+      this.drawingStart = { x: pointerEvent.x, y: pointerEvent.y };
+      this.hasMovedWhileDrawing = false;
+    }
+
     this.execute(() => {
-      this.activeTool.onMouseDown(this.getWorldPointerEvent(event));
+      this.activeTool.onMouseDown(pointerEvent);
     });
-    this.updateCursor(this.getWorldPointerEvent(event));
+    this.updateCursor(pointerEvent);
   };
 
   private handleMouseMove = (event: MouseEvent) => {
@@ -267,10 +298,17 @@ class CanvasEngine {
       this.canvas.style.cursor = "grabbing";
       return;
     }
+    const pointerEvent = this.getWorldPointerEvent(event);
+    if (
+      this.drawingStart &&
+      (pointerEvent.x !== this.drawingStart.x || pointerEvent.y !== this.drawingStart.y)
+    ) {
+      this.hasMovedWhileDrawing = true;
+    }
     this.execute(() => {
-      this.activeTool.onMouseMove(this.getWorldPointerEvent(event));
+      this.activeTool.onMouseMove(pointerEvent);
     });
-    this.updateCursor(this.getWorldPointerEvent(event));
+    this.updateCursor(pointerEvent);
   };
 
   private handleMouseUp = (event: MouseEvent) => {
@@ -280,10 +318,33 @@ class CanvasEngine {
       this.updateCursor();
       return;
     }
-    this.execute(() => {
-      this.activeTool.onMouseUp(this.getWorldPointerEvent(event));
-    });
-    this.updateCursor(this.getWorldPointerEvent(event));
+    const pointerEvent = this.getWorldPointerEvent(event);
+    const drawnShape = this.editor.currentShape;
+    const isCompletingDrawing =
+      ONE_SHOT_DRAWING_TOOLS.has(this.editor.currentTool) && this.editor.isDrawing && drawnShape;
+
+    if (
+      this.drawingStart &&
+      (pointerEvent.x !== this.drawingStart.x || pointerEvent.y !== this.drawingStart.y)
+    ) {
+      this.hasMovedWhileDrawing = true;
+    }
+
+    this.activeTool.onMouseUp(pointerEvent);
+
+    if (isCompletingDrawing) {
+      if (this.hasMovedWhileDrawing) {
+        this.editor.setSelectedShape(drawnShape);
+        this.switchToSelectTool();
+      } else {
+        this.scene.removeShape(drawnShape);
+      }
+    }
+
+    this.drawingStart = null;
+    this.hasMovedWhileDrawing = false;
+    this.render(false);
+    this.updateCursor(pointerEvent);
     this.saveScene();
   };
 
@@ -346,6 +407,12 @@ class CanvasEngine {
     }
 
     this.canvas.style.cursor = event ? this.tools.select.getCursor(event) : "default";
+  }
+
+  private switchToSelectTool() {
+    this.editor.setTool("select");
+    this.activeTool = this.tools.select;
+    this.onToolChange?.("select");
   }
 
   private handleResize = () => {

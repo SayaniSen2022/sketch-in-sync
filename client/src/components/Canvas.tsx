@@ -70,6 +70,8 @@ const Canvas = ({ tabId, discardOnUnmount = false, onDiscardReady }: CanvasProps
       engine.render();
     });
 
+    engine.setOnToolChange(setTool);
+
     setEditor(editorState);
 
     engine.setTool(tool);

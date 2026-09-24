@@ -28,5 +28,8 @@ export abstract class ToolStrategy {
   }
 
   /** Commits in-progress work (primarily used by the text tool). */
-  commitText(): void {}
+  commitText(): CanvasShape | null {
+    return null;
+  }
 }
+import type { CanvasShape } from "@/canvas/scene";

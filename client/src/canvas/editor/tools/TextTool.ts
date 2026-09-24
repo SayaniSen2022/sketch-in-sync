@@ -23,14 +23,14 @@ class TextTool extends ToolStrategy {
 
   onMouseUp(): void {}
 
-  commitText() {
-    if (!this.editor.textEditing) return;
+  commitText(): Text | null {
+    if (!this.editor.textEditing) return null;
 
     const text = this.editor.textValue.trim();
 
     if (!text) {
       this.editor.finishTextEditing();
-      return;
+      return null;
     }
 
     const textShape: Text = {
@@ -46,6 +46,7 @@ class TextTool extends ToolStrategy {
 
     this.scene.addShape(textShape);
     this.editor.finishTextEditing();
+    return textShape;
   }
 }
 export default TextTool;

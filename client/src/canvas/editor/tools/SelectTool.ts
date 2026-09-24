@@ -208,8 +208,8 @@ class SelectTool extends ToolStrategy {
     });
   }
 
-  commitText(): void {
-    if (!this.editor.textEditing || !this.editingText) return;
+  commitText(): CanvasShape | null {
+    if (!this.editor.textEditing || !this.editingText) return null;
 
     const shape = this.editingText;
     this.editingText = null;
@@ -223,11 +223,14 @@ class SelectTool extends ToolStrategy {
       shape.fillColor = this.editor.strokeColor;
       this.scene.addShape(shape);
       this.editor.setSelectedShape(shape);
+      this.editor.finishTextEditing();
+      return shape;
     } else {
       this.editor.clearSelection();
     }
 
     this.editor.finishTextEditing();
+    return null;
   }
 
   private getResizeHandle(x: number, y: number, shape: CanvasShape): string | null {
