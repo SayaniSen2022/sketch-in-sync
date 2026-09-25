@@ -18,8 +18,14 @@ import { loadStoredDocument, saveStoredDocument } from "./scene/persistence";
 import { MAX_ZOOM, MIN_ZOOM } from "./viewport";
 
 const AUTOSAVE_DELAY_MS = 350;
+const MAX_HISTORY_ENTRIES = 100;
 
 const ONE_SHOT_DRAWING_TOOLS = new Set<Tool>(["rectangle", "ellipse", "line", "arrow", "pencil"]);
+
+export interface CanvasHistory {
+  undoStack: CanvasShape[][];
+  redoStack: CanvasShape[][];
+}
 
 class CanvasEngine {
   private canvas: HTMLCanvasElement;
@@ -42,6 +48,11 @@ class CanvasEngine {
   private drawingStart: { x: number; y: number } | null = null;
   private hasMovedWhileDrawing = false;
   private onToolChange: ((tool: Tool) => void) | null = null;
+  private onHistoryChange: ((history: CanvasHistory) => void) | null = null;
+  private undoStack: CanvasShape[][] = [];
+  private redoStack: CanvasShape[][] = [];
+  private drawingHistorySnapshot: CanvasShape[] | null = null;
+  private interactionHistorySnapshot: CanvasShape[] | null = null;
 
   constructor(canvas: HTMLCanvasElement, tabId: string) {
     this.canvas = canvas;
@@ -90,7 +101,7 @@ class CanvasEngine {
 
   public setTool(tool: Tool) {
     if (tool === "hand") {
-      this.activeTool.commitText();
+      this.commitTextWithHistory();
       this.saveScene();
       this.editor.setTool(tool);
       this.onToolChange?.(tool);
@@ -107,7 +118,7 @@ class CanvasEngine {
     }
 
     // Let the current tool finish in-progress work before switching away.
-    this.activeTool.commitText();
+    this.commitTextWithHistory();
     this.saveScene();
 
     this.editor.setTool(tool);
@@ -121,7 +132,7 @@ class CanvasEngine {
    * Commits the active tool's in-progress work (e.g. the text draft), if any.
    */
   public finishTextEditing() {
-    const committedShape = this.activeTool.commitText();
+    const committedShape = this.commitTextWithHistory();
 
     if (this.editor.currentTool === "text" && committedShape) {
       this.editor.setSelectedShape(committedShape);
@@ -136,7 +147,35 @@ class CanvasEngine {
     this.onToolChange = callback;
   }
 
+  public setOnHistoryChange(callback: (history: CanvasHistory) => void) {
+    this.onHistoryChange = callback;
+    this.notifyHistoryChange();
+  }
+
+  public setHistory(history: CanvasHistory | undefined) {
+    this.undoStack = this.cloneHistoryStack(history?.undoStack ?? []);
+    this.redoStack = this.cloneHistoryStack(history?.redoStack ?? []);
+    this.notifyHistoryChange();
+  }
+
+  public undo() {
+    const previousShapes = this.undoStack.pop();
+    if (!previousShapes) return;
+
+    this.redoStack.push(this.cloneShapes());
+    this.restoreShapes(previousShapes);
+  }
+
+  public redo() {
+    const nextShapes = this.redoStack.pop();
+    if (!nextShapes) return;
+
+    this.undoStack.push(this.cloneShapes());
+    this.restoreShapes(nextShapes);
+  }
+
   public setStrokeColor(color: string) {
+    const historySnapshot = this.getShapeEditHistorySnapshot();
     this.getActiveShapes().forEach((shape) => {
       switch (shape.type) {
         case "rectangle":
@@ -153,10 +192,12 @@ class CanvasEngine {
     });
 
     this.editor.setStrokeColor(color);
+    this.recordHistorySnapshot(historySnapshot);
     this.saveScene();
   }
 
   public setStrokeWidth(width: number) {
+    const historySnapshot = this.getShapeEditHistorySnapshot();
     this.getActiveShapes().forEach((shape) => {
       switch (shape.type) {
         case "rectangle":
@@ -170,15 +211,18 @@ class CanvasEngine {
     });
 
     this.editor.setStrokeWidth(width);
+    this.recordHistorySnapshot(historySnapshot);
     this.saveScene();
   }
 
   public setTextFontSize(size: number) {
+    const historySnapshot = this.getShapeEditHistorySnapshot();
     this.getActiveShapes().forEach((shape) => {
       if (shape.type === "text") shape.fontSize = size;
     });
 
     this.editor.setTextFontSize(size);
+    this.recordHistorySnapshot(historySnapshot);
 
     if (!this.editor.textEditing) {
       this.saveScene();
@@ -186,11 +230,13 @@ class CanvasEngine {
   }
 
   public setTextFontFamily(fontFamily: string) {
+    const historySnapshot = this.getShapeEditHistorySnapshot();
     this.getActiveShapes().forEach((shape) => {
       if (shape.type === "text") shape.fontFamily = fontFamily;
     });
 
     this.editor.setTextFontFamily(fontFamily);
+    this.recordHistorySnapshot(historySnapshot);
 
     if (!this.editor.textEditing) {
       this.saveScene();
@@ -203,12 +249,14 @@ class CanvasEngine {
   }
 
   public clearCanvas() {
-    this.activeTool.commitText();
+    this.commitTextWithHistory();
+    const historySnapshot = this.scene.getShapes().length > 0 ? this.cloneShapes() : null;
     this.scene.clear();
     this.editor.clearSelection();
     this.editor.finishDrawing();
     this.editor.stopDragging();
     this.editor.stopResizing();
+    this.recordHistorySnapshot(historySnapshot);
     this.render(false);
     this.saveScene();
   }
@@ -281,11 +329,20 @@ class CanvasEngine {
     if (ONE_SHOT_DRAWING_TOOLS.has(this.editor.currentTool)) {
       this.drawingStart = { x: pointerEvent.x, y: pointerEvent.y };
       this.hasMovedWhileDrawing = false;
+      this.drawingHistorySnapshot = this.cloneShapes();
+    } else if (this.editor.currentTool === "select") {
+      this.interactionHistorySnapshot = this.cloneShapes();
     }
+
+    const eraserHistorySnapshot = this.editor.currentTool === "eraser" ? this.cloneShapes() : null;
+    const shapeCountBeforeErasing = this.scene.getShapes().length;
 
     this.execute(() => {
       this.activeTool.onMouseDown(pointerEvent);
     });
+    if (shapeCountBeforeErasing !== this.scene.getShapes().length) {
+      this.recordHistorySnapshot(eraserHistorySnapshot);
+    }
     this.updateCursor(pointerEvent);
   };
 
@@ -335,23 +392,32 @@ class CanvasEngine {
     if (isCompletingDrawing) {
       if (this.hasMovedWhileDrawing) {
         this.editor.setSelectedShape(drawnShape);
+        this.recordHistorySnapshot(this.drawingHistorySnapshot);
         this.switchToSelectTool();
       } else {
         this.scene.removeShape(drawnShape);
       }
     }
 
+    if (this.interactionHistorySnapshot && this.hasSceneChanged(this.interactionHistorySnapshot)) {
+      this.recordHistorySnapshot(this.interactionHistorySnapshot);
+    }
+
     this.drawingStart = null;
     this.hasMovedWhileDrawing = false;
+    this.drawingHistorySnapshot = null;
+    this.interactionHistorySnapshot = null;
     this.render(false);
     this.updateCursor(pointerEvent);
     this.saveScene();
   };
 
   private handleDoubleClick = (event: MouseEvent) => {
+    const historySnapshot = this.cloneShapes();
     this.execute(() => {
       this.activeTool.onDoubleClick(this.getWorldPointerEvent(event));
     });
+    if (this.editor.textEditing) this.recordHistorySnapshot(historySnapshot);
   };
 
   private handleWheel = (event: WheelEvent) => {
@@ -369,6 +435,24 @@ class CanvasEngine {
   };
 
   private handleKeyDown = (event: KeyboardEvent) => {
+    if (event.target instanceof HTMLTextAreaElement) return;
+
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
+      event.preventDefault();
+      if (event.shiftKey) {
+        this.redo();
+      } else {
+        this.undo();
+      }
+      return;
+    }
+
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "y") {
+      event.preventDefault();
+      this.redo();
+      return;
+    }
+
     if (event.code === "Space" && !(event.target instanceof HTMLTextAreaElement)) {
       this.isSpacePressed = true;
       event.preventDefault();
@@ -382,11 +466,13 @@ class CanvasEngine {
       event.preventDefault();
       return;
     }
-    if (event.key !== "Delete" || event.target instanceof HTMLTextAreaElement) return;
+    if (event.key !== "Delete") return;
     if (this.editor.selectedShapes.length === 0) return;
     event.preventDefault();
+    const historySnapshot = this.cloneShapes();
     this.scene.removeShapes(this.editor.selectedShapes);
     this.editor.clearSelection();
+    this.recordHistorySnapshot(historySnapshot);
     this.render(false);
     this.saveScene();
   };
@@ -394,6 +480,66 @@ class CanvasEngine {
   private handleKeyUp = (event: KeyboardEvent) => {
     if (event.code === "Space") this.isSpacePressed = false;
   };
+
+  private commitTextWithHistory(): CanvasShape | null {
+    const historySnapshot = this.editor.currentTool === "text" ? this.cloneShapes() : null;
+    const committedShape = this.activeTool.commitText();
+
+    if (committedShape) this.recordHistorySnapshot(historySnapshot);
+
+    return committedShape;
+  }
+
+  private getShapeEditHistorySnapshot(): CanvasShape[] | null {
+    if (
+      this.editor.textEditing ||
+      this.editor.currentShape ||
+      this.editor.selectedShapes.length === 0
+    ) {
+      return null;
+    }
+
+    return this.cloneShapes();
+  }
+
+  private cloneShapes(): CanvasShape[] {
+    return JSON.parse(JSON.stringify(this.scene.getShapes())) as CanvasShape[];
+  }
+
+  private cloneHistoryStack(historyStack: CanvasShape[][]): CanvasShape[][] {
+    return JSON.parse(JSON.stringify(historyStack)) as CanvasShape[][];
+  }
+
+  private hasSceneChanged(snapshot: CanvasShape[]): boolean {
+    return JSON.stringify(snapshot) !== JSON.stringify(this.scene.getShapes());
+  }
+
+  private recordHistorySnapshot(snapshot: CanvasShape[] | null) {
+    if (!snapshot || !this.hasSceneChanged(snapshot)) return;
+
+    this.undoStack.push(snapshot);
+    if (this.undoStack.length > MAX_HISTORY_ENTRIES) this.undoStack.shift();
+    this.redoStack = [];
+    this.notifyHistoryChange();
+  }
+
+  private restoreShapes(shapes: CanvasShape[]) {
+    this.scene.replaceShapes(JSON.parse(JSON.stringify(shapes)) as CanvasShape[]);
+    this.editor.clearSelection();
+    this.editor.finishDrawing();
+    this.editor.stopDragging();
+    this.editor.stopResizing();
+    this.render(false);
+    this.saveScene();
+    this.notifyHistoryChange();
+  }
+
+  private notifyHistoryChange() {
+    this.onHistoryChange?.({
+      undoStack: this.cloneHistoryStack(this.undoStack),
+      redoStack: this.cloneHistoryStack(this.redoStack),
+    });
+  }
 
   private execute(action: () => void) {
     action();
