@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Canvas from "@/components/Canvas";
+import type { CanvasHistory } from "@/canvas/CanvasEngine";
 import CloseTabModal from "@/components/CloseTabModal";
 import TabBar, { type CanvasTab } from "@/components/TabBar";
 import {
@@ -16,6 +17,7 @@ function App() {
   const [workspace, setWorkspace] = useState(() => loadStoredWorkspace());
   const [pendingCloseTabId, setPendingCloseTabId] = useState<string | null>(null);
   const [closingTabId, setClosingTabId] = useState<string | null>(null);
+  const tabHistoriesRef = useRef(new Map<string, CanvasHistory>());
   const tabs: CanvasTab[] = workspace.tabs;
   const activeTabId = workspace.activeTabId;
 
@@ -62,6 +64,7 @@ function App() {
       const closingIndex = tabs.findIndex((candidate) => candidate.id === tabId);
       const remainingTabs = tabs.filter((candidate) => candidate.id !== tabId);
       clearStoredDocument(tabId);
+      tabHistoriesRef.current.delete(tabId);
 
       if (remainingTabs.length === 0) {
         const replacement = createTab("Untitled 1", true);
@@ -106,6 +109,8 @@ function App() {
         tabId={activeTabId}
         discardOnUnmount={closingTabId === activeTabId}
         onDiscardReady={handleDiscardReady}
+        getInitialHistory={() => tabHistoriesRef.current.get(activeTabId)}
+        onHistoryChange={(history) => tabHistoriesRef.current.set(activeTabId, history)}
       />
       <TabBar
         tabs={tabs}

@@ -7,8 +7,10 @@ import {
   Minus,
   MousePointer,
   Pencil,
+  Redo2,
   RectangleHorizontal,
   TextInitial,
+  Undo2,
   type LucideIcon,
 } from "lucide-react";
 import "../index.css";
@@ -21,6 +23,10 @@ type ToolbarProps = {
   onZoomIn: () => void;
   onZoomOut: () => void;
   onResetZoom: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
 };
 
 const TOOLS: { tool: Tool; label: string; icon: LucideIcon }[] = [
@@ -43,6 +49,10 @@ export default function Toolbar({
   onZoomIn,
   onZoomOut,
   onResetZoom,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
 }: ToolbarProps) {
   return (
     <nav className="absolute z-100 bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 border border-white/10 bg-neutral-800 p-1 text-white shadow-xl">
@@ -76,6 +86,28 @@ export default function Toolbar({
         </button>
         <button type="button" aria-label="Zoom in" onClick={onZoomIn}>
           +
+        </button>
+      </div>
+      <div className="flex items-center gap-1 border-l border-white/20 pl-2">
+        <button
+          type="button"
+          aria-label="Undo"
+          title="Undo (Ctrl+Z)"
+          disabled={!canUndo}
+          className="cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+          onClick={onUndo}
+        >
+          <Undo2 size={18} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          aria-label="Redo"
+          title="Redo (Ctrl+Y or Ctrl+Shift+Z)"
+          disabled={!canRedo}
+          className="cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+          onClick={onRedo}
+        >
+          <Redo2 size={18} aria-hidden="true" />
         </button>
       </div>
       <div className="flex items-center border-l border-white/20 pl-2">

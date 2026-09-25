@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import type { Tool } from "@/canvas/editor/Tool";
 import CanvasEngine from "../canvas/CanvasEngine";
+import type { CanvasHistory } from "../canvas/CanvasEngine";
 import Toolbar from "./Toolbar";
 import StyleSidebar from "./StyleSidebar";
 import EditorState from "@/canvas/editor/EditorState";
@@ -10,11 +11,20 @@ type CanvasProps = {
   tabId: string;
   discardOnUnmount?: boolean;
   onDiscardReady?: () => void;
+  getInitialHistory?: () => CanvasHistory | undefined;
+  onHistoryChange?: (history: CanvasHistory) => void;
 };
 
-const Canvas = ({ tabId, discardOnUnmount = false, onDiscardReady }: CanvasProps) => {
+const Canvas = ({
+  tabId,
+  discardOnUnmount = false,
+  onDiscardReady,
+  getInitialHistory,
+  onHistoryChange,
+}: CanvasProps) => {
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [, forceUpdate] = useState(0);
+  const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false });
   //reference to the real DOM element. When React mounts the component, internally it creates the canvas element
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<CanvasEngine | null>(null);
@@ -71,13 +81,21 @@ const Canvas = ({ tabId, discardOnUnmount = false, onDiscardReady }: CanvasProps
     });
 
     engine.setOnToolChange(setTool);
+    engine.setHistory(getInitialHistory?.());
+    engine.setOnHistoryChange((history) => {
+      setHistoryState({
+        canUndo: history.undoStack.length > 0,
+        canRedo: history.redoStack.length > 0,
+      });
+      onHistoryChange?.(history);
+    });
 
     setEditor(editorState);
 
     engine.setTool(tool);
 
     return () => engine.destroy();
-    // The engine is intentionally created once; later tool changes are forwarded directly above.
+    // The engine is intentionally created once per tab; its initial history belongs to that tab.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -124,6 +142,10 @@ const Canvas = ({ tabId, discardOnUnmount = false, onDiscardReady }: CanvasProps
         onZoomIn={() => engine?.zoomBy(0.25)}
         onZoomOut={() => engine?.zoomBy(-0.25)}
         onResetZoom={() => engine?.resetZoom()}
+        canUndo={historyState.canUndo}
+        canRedo={historyState.canRedo}
+        onUndo={() => engine?.undo()}
+        onRedo={() => engine?.redo()}
       />
       <StyleSidebar
         editor={editor}
