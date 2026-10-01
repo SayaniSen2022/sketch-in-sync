@@ -146,6 +146,7 @@ const Canvas = ({
         canRedo={historyState.canRedo}
         onUndo={() => engine?.undo()}
         onRedo={() => engine?.redo()}
+        activeTabId={tabId}
       />
       <StyleSidebar
         editor={editor}

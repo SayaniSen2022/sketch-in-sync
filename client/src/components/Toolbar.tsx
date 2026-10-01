@@ -11,8 +11,10 @@ import {
   RectangleHorizontal,
   TextInitial,
   Undo2,
+  Trash,
   type LucideIcon,
 } from "lucide-react";
+import ExportMenu from "./ExportMenu";
 import "../index.css";
 
 type ToolbarProps = {
@@ -27,6 +29,7 @@ type ToolbarProps = {
   canRedo: boolean;
   onUndo: () => void;
   onRedo: () => void;
+  activeTabId: string;
 };
 
 const TOOLS: { tool: Tool; label: string; icon: LucideIcon }[] = [
@@ -53,6 +56,7 @@ export default function Toolbar({
   canRedo,
   onUndo,
   onRedo,
+  activeTabId,
 }: ToolbarProps) {
   return (
     <nav className="absolute z-100 bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 border border-white/10 bg-neutral-800 p-1 text-white shadow-xl">
@@ -113,11 +117,12 @@ export default function Toolbar({
       <div className="flex items-center border-l border-white/20 pl-2">
         <button
           type="button"
-          className="bg-red-400 px-2 py-0.5 text-md font-medium text-white hover:bg-red-500 transition-colors duration-300 ease-in-out cursor-pointer"
+          className="px-2 py-0.5 text-md font-medium text-white hover:text-red-500 transition-colors duration-300 ease-in-out cursor-pointer"
           onClick={onClearCanvas}
         >
-          Clear
+          <Trash size={18} aria-hidden="true" />
         </button>
+        <ExportMenu activeTabId={activeTabId} />
       </div>
     </nav>
   );
