@@ -15,6 +15,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import ExportMenu from "./ExportMenu";
+import type { CanvasDocument, CanvasWorkspace, StoredCanvasTab } from "@/canvas/scene/persistence";
 import "../index.css";
 
 type ToolbarProps = {
@@ -30,6 +31,11 @@ type ToolbarProps = {
   onUndo: () => void;
   onRedo: () => void;
   activeTabId: string;
+  onImportTab: (tab: StoredCanvasTab, document: CanvasDocument) => void;
+  onImportWorkspace: (
+    workspace: CanvasWorkspace,
+    documents: Record<string, CanvasDocument>,
+  ) => void;
 };
 
 const TOOLS: { tool: Tool; label: string; icon: LucideIcon }[] = [
@@ -57,6 +63,8 @@ export default function Toolbar({
   onUndo,
   onRedo,
   activeTabId,
+  onImportTab,
+  onImportWorkspace,
 }: ToolbarProps) {
   return (
     <nav className="absolute z-100 bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 border border-white/10 bg-neutral-800 p-1 text-white shadow-xl">
@@ -122,7 +130,11 @@ export default function Toolbar({
         >
           <Trash size={18} aria-hidden="true" />
         </button>
-        <ExportMenu activeTabId={activeTabId} />
+        <ExportMenu
+          activeTabId={activeTabId}
+          onImportTab={onImportTab}
+          onImportWorkspace={onImportWorkspace}
+        />
       </div>
     </nav>
   );

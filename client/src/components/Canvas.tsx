@@ -5,6 +5,7 @@ import type { CanvasHistory } from "../canvas/CanvasEngine";
 import Toolbar from "./Toolbar";
 import StyleSidebar from "./StyleSidebar";
 import EditorState from "@/canvas/editor/EditorState";
+import type { CanvasDocument, CanvasWorkspace, StoredCanvasTab } from "@/canvas/scene/persistence";
 import { DEFAULT_CANVAS_BACKGROUND } from "@/canvas/stylePresets";
 
 type CanvasProps = {
@@ -13,6 +14,11 @@ type CanvasProps = {
   onDiscardReady?: () => void;
   getInitialHistory?: () => CanvasHistory | undefined;
   onHistoryChange?: (history: CanvasHistory) => void;
+  onImportTab: (tab: StoredCanvasTab, document: CanvasDocument) => void;
+  onImportWorkspace: (
+    workspace: CanvasWorkspace,
+    documents: Record<string, CanvasDocument>,
+  ) => void;
 };
 
 const Canvas = ({
@@ -21,6 +27,8 @@ const Canvas = ({
   onDiscardReady,
   getInitialHistory,
   onHistoryChange,
+  onImportTab,
+  onImportWorkspace,
 }: CanvasProps) => {
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [, forceUpdate] = useState(0);
@@ -147,6 +155,8 @@ const Canvas = ({
         onUndo={() => engine?.undo()}
         onRedo={() => engine?.redo()}
         activeTabId={tabId}
+        onImportTab={onImportTab}
+        onImportWorkspace={onImportWorkspace}
       />
       <StyleSidebar
         editor={editor}

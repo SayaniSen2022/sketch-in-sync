@@ -2,11 +2,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Canvas from "@/components/Canvas";
 import type { CanvasHistory } from "@/canvas/CanvasEngine";
 import CloseTabModal from "@/components/CloseTabModal";
+import ImportWorkspaceModal from "@/components/ImportWorkspaceModal";
 import TabBar, { type CanvasTab } from "@/components/TabBar";
 import {
+  saveCanvasDocument,
+  type CanvasDocument,
+  type CanvasWorkspace,
   clearStoredDocument,
   loadStoredWorkspace,
   saveStoredWorkspace,
+  type StoredCanvasTab,
 } from "@/canvas/scene/persistence";
 
 function createTab(title: string, isDefault = false): CanvasTab {
@@ -17,6 +22,12 @@ function App() {
   const [workspace, setWorkspace] = useState(() => loadStoredWorkspace());
   const [pendingCloseTabId, setPendingCloseTabId] = useState<string | null>(null);
   const [closingTabId, setClosingTabId] = useState<string | null>(null);
+  const [pendingWorkspaceImport, setPendingWorkspaceImport] = useState<{
+    workspace: CanvasWorkspace;
+    documents: Record<string, CanvasDocument>;
+  } | null>(null);
+  const [replacingWorkspace, setReplacingWorkspace] = useState(false);
+  const [workspaceRevision, setWorkspaceRevision] = useState(0);
   const tabHistoriesRef = useRef(new Map<string, CanvasHistory>());
   const tabs: CanvasTab[] = workspace.tabs;
   const activeTabId = workspace.activeTabId;
@@ -54,6 +65,22 @@ function App() {
 
       return { ...currentWorkspace, tabs: nextTabs };
     });
+  };
+
+  const importTab = (importedTab: StoredCanvasTab, document: CanvasDocument) => {
+    const tab = createTab(importedTab.title);
+    saveCanvasDocument(document, tab.id);
+    setWorkspace((currentWorkspace) => ({
+      tabs: [...currentWorkspace.tabs, tab],
+      activeTabId: tab.id,
+    }));
+  };
+
+  const requestWorkspaceImport = (
+    importedWorkspace: CanvasWorkspace,
+    documents: Record<string, CanvasDocument>,
+  ) => {
+    setPendingWorkspaceImport({ workspace: importedWorkspace, documents });
   };
 
   const closeTab = useCallback(
@@ -94,23 +121,42 @@ function App() {
   };
 
   const handleDiscardReady = useCallback(() => {
-    if (!closingTabId) return;
+    if (closingTabId) {
+      closeTab(closingTabId);
+      setClosingTabId(null);
+      return;
+    }
 
-    closeTab(closingTabId);
-    setClosingTabId(null);
-  }, [closingTabId, closeTab]);
+    if (!replacingWorkspace || !pendingWorkspaceImport) return;
+
+    tabs.forEach((tab) => clearStoredDocument(tab.id));
+    pendingWorkspaceImport.workspace.tabs.forEach((tab) => {
+      saveCanvasDocument(pendingWorkspaceImport.documents[tab.id], tab.id);
+    });
+    saveStoredWorkspace(
+      pendingWorkspaceImport.workspace.tabs,
+      pendingWorkspaceImport.workspace.activeTabId,
+    );
+    tabHistoriesRef.current.clear();
+    setWorkspace(pendingWorkspaceImport.workspace);
+    setWorkspaceRevision((revision) => revision + 1);
+    setPendingWorkspaceImport(null);
+    setReplacingWorkspace(false);
+  }, [closingTabId, closeTab, pendingWorkspaceImport, replacingWorkspace, tabs]);
 
   const pendingCloseTab = tabs.find((tab) => tab.id === pendingCloseTabId);
 
   return (
     <div className="relative">
       <Canvas
-        key={activeTabId}
+        key={`${activeTabId}:${workspaceRevision}`}
         tabId={activeTabId}
-        discardOnUnmount={closingTabId === activeTabId}
+        discardOnUnmount={closingTabId === activeTabId || replacingWorkspace}
         onDiscardReady={handleDiscardReady}
         getInitialHistory={() => tabHistoriesRef.current.get(activeTabId)}
         onHistoryChange={(history) => tabHistoriesRef.current.set(activeTabId, history)}
+        onImportTab={importTab}
+        onImportWorkspace={requestWorkspaceImport}
       />
       <TabBar
         tabs={tabs}
@@ -128,6 +174,12 @@ function App() {
           tabTitle={pendingCloseTab.title}
           onConfirm={confirmCloseTab}
           onCancel={() => setPendingCloseTabId(null)}
+        />
+      )}
+      {pendingWorkspaceImport && !replacingWorkspace && (
+        <ImportWorkspaceModal
+          onConfirm={() => setReplacingWorkspace(true)}
+          onCancel={() => setPendingWorkspaceImport(null)}
         />
       )}
     </div>

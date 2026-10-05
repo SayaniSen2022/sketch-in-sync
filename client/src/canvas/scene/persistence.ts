@@ -10,11 +10,14 @@ const WORKSPACE_VERSION = 1;
 
 export const DEFAULT_TAB_ID = "default";
 
-interface StoredDocument {
-  version: number;
+export interface CanvasDocument {
   shapes: CanvasShape[];
   backgroundColor: string;
   viewport: Viewport;
+}
+
+interface StoredDocument extends CanvasDocument {
+  version: number;
 }
 
 interface StoredSceneV1 {
@@ -28,19 +31,18 @@ export interface StoredCanvasTab {
   isDefault: boolean;
 }
 
-interface StoredWorkspace {
-  version: number;
+export interface CanvasWorkspace {
   tabs: StoredCanvasTab[];
   activeTabId: string;
 }
 
+interface StoredWorkspace extends CanvasWorkspace {
+  version: number;
+}
+
 let hasReportedStorageError = false;
 
-export function loadStoredDocument(tabId = DEFAULT_TAB_ID): {
-  shapes: CanvasShape[];
-  backgroundColor: string;
-  viewport: Viewport;
-} {
+export function loadStoredDocument(tabId = DEFAULT_TAB_ID): CanvasDocument {
   try {
     const value =
       window.localStorage.getItem(getDocumentStorageKey(tabId)) ??
@@ -93,6 +95,10 @@ export function saveStoredDocument(
   }
 }
 
+export function saveCanvasDocument(document: CanvasDocument, tabId: string): void {
+  saveStoredDocument(document.shapes, document.backgroundColor, document.viewport, tabId);
+}
+
 export function clearStoredDocument(tabId = DEFAULT_TAB_ID): void {
   try {
     window.localStorage.removeItem(getDocumentStorageKey(tabId));
@@ -101,7 +107,7 @@ export function clearStoredDocument(tabId = DEFAULT_TAB_ID): void {
   }
 }
 
-export function loadStoredWorkspace(): { tabs: StoredCanvasTab[]; activeTabId: string } {
+export function loadStoredWorkspace(): CanvasWorkspace {
   try {
     const value = window.localStorage.getItem(WORKSPACE_STORAGE_KEY);
 
@@ -135,25 +141,9 @@ function getDocumentStorageKey(tabId: string): string {
   return `${DOCUMENT_STORAGE_PREFIX}${encodeURIComponent(tabId)}`;
 }
 
-function emptyWorkspace(): { tabs: StoredCanvasTab[]; activeTabId: string } {
-  return {
-    tabs: [{ id: DEFAULT_TAB_ID, title: "Untitled 1", isDefault: true }],
-    activeTabId: DEFAULT_TAB_ID,
-  };
-}
-
-function emptyDocument(): { shapes: CanvasShape[]; backgroundColor: string; viewport: Viewport } {
-  return {
-    shapes: [],
-    backgroundColor: DEFAULT_CANVAS_BACKGROUND,
-    viewport: { ...DEFAULT_VIEWPORT },
-  };
-}
-
-function isStoredDocument(value: unknown): value is StoredDocument {
+export function isCanvasDocument(value: unknown): value is CanvasDocument {
   return (
     isRecord(value) &&
-    value.version === STORAGE_VERSION &&
     Array.isArray(value.shapes) &&
     isBackgroundColor(value.backgroundColor) &&
     isViewport(value.viewport) &&
@@ -161,10 +151,9 @@ function isStoredDocument(value: unknown): value is StoredDocument {
   );
 }
 
-function isStoredWorkspace(value: unknown): value is StoredWorkspace {
+export function isCanvasWorkspace(value: unknown): value is CanvasWorkspace {
   return (
     isRecord(value) &&
-    value.version === WORKSPACE_VERSION &&
     typeof value.activeTabId === "string" &&
     Array.isArray(value.tabs) &&
     value.tabs.length > 0 &&
@@ -177,6 +166,29 @@ function isStoredWorkspace(value: unknown): value is StoredWorkspace {
     ) &&
     value.tabs.some((tab) => tab.id === value.activeTabId)
   );
+}
+
+function emptyWorkspace(): CanvasWorkspace {
+  return {
+    tabs: [{ id: DEFAULT_TAB_ID, title: "Untitled 1", isDefault: true }],
+    activeTabId: DEFAULT_TAB_ID,
+  };
+}
+
+function emptyDocument(): CanvasDocument {
+  return {
+    shapes: [],
+    backgroundColor: DEFAULT_CANVAS_BACKGROUND,
+    viewport: { ...DEFAULT_VIEWPORT },
+  };
+}
+
+function isStoredDocument(value: unknown): value is StoredDocument {
+  return isRecord(value) && value.version === STORAGE_VERSION && isCanvasDocument(value);
+}
+
+function isStoredWorkspace(value: unknown): value is StoredWorkspace {
+  return isRecord(value) && value.version === WORKSPACE_VERSION && isCanvasWorkspace(value);
 }
 
 function isViewport(value: unknown): value is Viewport {
