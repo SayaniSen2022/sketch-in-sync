@@ -3,6 +3,7 @@ import type { Tool } from "@/canvas/editor/Tool";
 import CanvasEngine from "../canvas/CanvasEngine";
 import type { CanvasHistory } from "../canvas/CanvasEngine";
 import Toolbar from "./Toolbar";
+import ShareButton from "./ShareButton";
 import StyleSidebar from "./StyleSidebar";
 import EditorState from "@/canvas/editor/EditorState";
 import type { CanvasDocument, CanvasWorkspace, StoredCanvasTab } from "@/canvas/scene/persistence";
@@ -165,6 +166,7 @@ const Canvas = ({
         onTextFontSizeChange={(size) => engine?.setTextFontSize(size)}
         onTextFontFamilyChange={(fontFamily) => engine?.setTextFontFamily(fontFamily)}
       />
+      <ShareButton />
 
       <canvas
         className={`absolute inset-0 h-full w-full ${
